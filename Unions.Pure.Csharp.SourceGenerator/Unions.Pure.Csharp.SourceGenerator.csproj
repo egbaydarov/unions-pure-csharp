@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>true</IsPackable>
+    <PackageId>Unions.Pure.Csharp</PackageId>
+    <Description>Source generator that builds compact discriminated unions.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>union;discriminated-union;source-generator</PackageTags>
+    <RepositoryUrl>https://github.com/egbaydarov/unions-pure-csharp</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageOutputPath>../artifacts</PackageOutputPath>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="" />
+    <None Include="$(TargetPath)" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="$(TargetDir)$(AssemblyName).pdb" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" Condition="Exists('$(TargetDir)$(AssemblyName).pdb')" />
+  </ItemGroup>
+</Project>

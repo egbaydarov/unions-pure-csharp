@@ -1,0 +1,103 @@
+; Assembly listing for method System.Text.Json.JsonSerializerOptions:GetTypeInfoInternal(System.Type,ubyte,System.Nullable`1[ubyte],ubyte,ubyte):System.Text.Json.Serialization.Metadata.JsonTypeInfo:this (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 5 single block inlinees; 4 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     r12
+       push     rbx
+       push     rax
+       lea      rbp, [rsp+0x30]
+       mov      dword ptr [rbp-0x30], ecx
+       mov      rbx, rdi
+       mov      r15, rsi
+       mov      r14d, edx
+       mov      r13d, r9d
+ 
+G_M000_IG02:
+       xor      r12, r12
+       cmp      byte  ptr [rbx+0x9D], 0
+       jne      SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       test     r8b, r8b
+       je       SHORT G_M000_IG06
+       mov      rdi, rbx
+       mov      rsi, r15
+       call     [System.Text.Json.JsonSerializerOptions:GetTypeInfoNoCaching(System.Type):System.Text.Json.Serialization.Metadata.JsonTypeInfo:this]
+       mov      r12, rax
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG04:
+       mov      rdi, gword ptr [rbx+0x08]
+       test     rdi, rdi
+       jne      SHORT G_M000_IG05
+       mov      rdi, rbx
+       call     [System.Text.Json.JsonSerializerOptions+TrackedCachingContexts:GetOrCreate(System.Text.Json.JsonSerializerOptions):System.Text.Json.JsonSerializerOptions+CachingContext]
+       mov      r12, rax
+       lea      rdi, bword ptr [rbx+0x08]
+       test     rdi, rdi
+       je       SHORT G_M000_IG11
+       mov      rsi, r12
+       xor      rdx, rdx
+       call     System.Threading.Interlocked:CompareExchangeObject(byref,System.Object,System.Object):System.Object
+       test     rax, rax
+       cmove    rax, r12
+       mov      rdi, rax
+ 
+G_M000_IG05:
+       movzx    rdx, r13b
+       mov      rsi, r15
+       cmp      dword ptr [rdi], edi
+       call     [System.Text.Json.JsonSerializerOptions+CachingContext:GetOrAddTypeInfo(System.Type,ubyte):System.Text.Json.Serialization.Metadata.JsonTypeInfo:this]
+       mov      r12, rax
+       test     r14b, r14b
+       je       SHORT G_M000_IG06
+       test     r12, r12
+       je       SHORT G_M000_IG06
+       cmp      byte  ptr [r12+0x115], 2
+       je       SHORT G_M000_IG06
+       mov      rdi, r12
+       call     [System.Text.Json.Serialization.Metadata.JsonTypeInfo:<EnsureConfigured>g__ConfigureSynchronized|172_0():this]
+ 
+G_M000_IG06:
+       test     r12, r12
+       jne      SHORT G_M000_IG08
+ 
+G_M000_IG07:
+       cmp      byte  ptr [rbp-0x2F], 0
+       jne      SHORT G_M000_IG10
+ 
+G_M000_IG08:
+       mov      rax, r12
+ 
+G_M000_IG09:
+       add      rsp, 8
+       pop      rbx
+       pop      r12
+       pop      r13
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+G_M000_IG10:
+       mov      rsi, gword ptr [rbx+0x20]
+       mov      rdi, r15
+       call     [System.Text.Json.ThrowHelper:ThrowNotSupportedException_NoMetadataForType(System.Type,System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver)]
+       int3     
+ 
+G_M000_IG11:
+       call     [System.ThrowHelper:ThrowNullReferenceException()]
+       int3     
+ 
+; Total bytes of code 213
+

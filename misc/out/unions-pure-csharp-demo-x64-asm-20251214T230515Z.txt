@@ -1,0 +1,894 @@
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Match(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 0 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     rbx
+       sub      rsp, 24
+       lea      rbp, [rsp+0x20]
+       mov      gword ptr [rbp-0x18], rdi
+       mov      qword ptr [rbp-0x10], rsi
+ 
+G_M000_IG02:
+       test     byte  ptr [(reloc)], 1
+       je       SHORT G_M000_IG09
+ 
+G_M000_IG03:
+       mov      rsi, 0xD1FFAB1E
+       mov      rax, gword ptr [rsi]
+       mov      rsi, 0xD1FFAB1E
+       mov      rbx, gword ptr [rsi]
+       movzx    rdi, byte  ptr [rbp-0x0C]
+       cmp      edi, 1
+       jne      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       mov      rsi, gword ptr [rbp-0x18]
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Func`2[System.__Canon,int]:Invoke(System.__Canon):int:this
+       jmp      SHORT G_M000_IG07
+ 
+G_M000_IG05:
+       cmp      edi, 2
+       je       SHORT G_M000_IG06
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag[int](ubyte):int]
+       jmp      SHORT G_M000_IG07
+ 
+G_M000_IG06:
+       mov      esi, dword ptr [rbp-0x10]
+       mov      rdi, gword ptr [rbx+0x08]
+       call     [rbx+0x18]System.Func`2[int,int]:Invoke(int):int:this
+ 
+G_M000_IG07:
+       nop      
+ 
+G_M000_IG08:
+       add      rsp, 24
+       pop      rbx
+       pop      rbp
+       ret      
+ 
+G_M000_IG09:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_GET_NONGCSTATIC_BASE
+       jmp      SHORT G_M000_IG03
+ 
+; Total bytes of code 125
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Switch_NoAlloc(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 0 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     rbx
+       sub      rsp, 24
+       lea      rbp, [rsp+0x30]
+       mov      gword ptr [rbp-0x28], rdi
+       mov      qword ptr [rbp-0x20], rsi
+ 
+G_M000_IG02:
+       mov      rbx, 0xD1FFAB1E
+       xor      edi, edi
+       mov      dword ptr [rbx], edi
+       mov      rdi, 0xD1FFAB1E
+       mov      r15, gword ptr [rdi]
+       mov      rdi, 0xD1FFAB1E
+       mov      r14, gword ptr [rdi]
+       movzx    rdi, byte  ptr [rbp-0x1C]
+       cmp      edi, 1
+       je       SHORT G_M000_IG05
+ 
+G_M000_IG03:
+       cmp      edi, 2
+       je       SHORT G_M000_IG04
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag(ubyte)]
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG04:
+       mov      esi, dword ptr [rbp-0x20]
+       mov      rdi, gword ptr [r14+0x08]
+       call     [r14+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG05:
+       mov      rsi, gword ptr [rbp-0x28]
+       mov      rdi, gword ptr [r15+0x08]
+       call     [r15+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG06:
+       mov      eax, dword ptr [rbx]
+ 
+G_M000_IG07:
+       add      rsp, 24
+       pop      rbx
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 124
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Switch_CapturingAlloc(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 2 single block inlinees; 3 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     rbx
+       sub      rsp, 16
+       lea      rbp, [rsp+0x30]
+       mov      gword ptr [rbp-0x30], rdi
+       mov      qword ptr [rbp-0x28], rsi
+ 
+G_M000_IG02:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       xor      edi, edi
+       mov      dword ptr [rbx+0x08], edi
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r15, rax
+       movzx    r14, byte  ptr [rbp-0x24]
+       lea      rdi, bword ptr [r15+0x08]
+       mov      rsi, rbx
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rdi, 0xD1FFAB1E
+       mov      qword ptr [r15+0x18], rdi
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r13, rax
+       lea      rdi, bword ptr [r13+0x08]
+       mov      rsi, rbx
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rdi, 0xD1FFAB1E
+       mov      qword ptr [r13+0x18], rdi
+       cmp      r14d, 1
+       je       SHORT G_M000_IG05
+ 
+G_M000_IG03:
+       cmp      r14d, 2
+       je       SHORT G_M000_IG04
+       mov      edi, r14d
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag(ubyte)]
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG04:
+       mov      esi, dword ptr [rbp-0x28]
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG05:
+       mov      rsi, gword ptr [rbp-0x30]
+       mov      rdi, gword ptr [r15+0x08]
+       call     [r15+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG06:
+       mov      eax, dword ptr [rbx+0x08]
+ 
+G_M000_IG07:
+       add      rsp, 16
+       pop      rbx
+       pop      r13
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 205
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program+<>c__DisplayClass18_0:<Asm_Switch_CapturingAlloc>b__1(int):this (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rsp based frame
+; partially interruptible
+; No PGO data
+
+G_M000_IG01:
+ 
+G_M000_IG02:
+       mov      dword ptr [rdi+0x08], 222
+ 
+G_M000_IG03:
+       ret      
+ 
+; Total bytes of code 8
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_MatchAndSwitch(int):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 4 single block inlinees; 2 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     r12
+       push     rbx
+       push     rax
+       lea      rbp, [rsp+0x30]
+ 
+G_M000_IG02:
+       test     dil, 1
+       jne      SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       mov      rbx, 0xD1FFAB1E
+       xor      r15d, r15d
+       mov      edi, 1
+       jmp      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       xor      rbx, rbx
+       mov      r15d, 7
+       mov      edi, 2
+ 
+G_M000_IG05:
+       mov      rax, 0xD1FFAB1E
+       mov      r14, gword ptr [rax]
+       mov      rax, 0xD1FFAB1E
+       mov      r13, gword ptr [rax]
+       movzx    r12, dil
+       cmp      r12d, 1
+       je       SHORT G_M000_IG08
+ 
+G_M000_IG06:
+       cmp      r12d, 2
+       je       SHORT G_M000_IG07
+       mov      edi, r12d
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag[int](ubyte):int]
+       mov      r14d, eax
+       jmp      SHORT G_M000_IG09
+ 
+G_M000_IG07:
+       mov      esi, r15d
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Func`2[int,int]:Invoke(int):int:this
+       mov      r14d, eax
+       jmp      SHORT G_M000_IG09
+ 
+G_M000_IG08:
+       mov      rsi, rbx
+       mov      rdi, gword ptr [r14+0x08]
+       call     [r14+0x18]System.Func`2[System.__Canon,int]:Invoke(System.__Canon):int:this
+       mov      r14d, eax
+ 
+G_M000_IG09:
+       mov      rdi, 0xD1FFAB1E
+       mov      r13, gword ptr [rdi]
+       mov      rdi, 0xD1FFAB1E
+       mov      rax, gword ptr [rdi]
+       cmp      r12d, 1
+       je       SHORT G_M000_IG12
+ 
+G_M000_IG10:
+       cmp      r12d, 2
+       je       SHORT G_M000_IG11
+       mov      edi, r12d
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag(ubyte)]
+       jmp      SHORT G_M000_IG13
+ 
+G_M000_IG11:
+       mov      esi, r15d
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG13
+ 
+G_M000_IG12:
+       mov      rsi, rbx
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG13:
+       mov      eax, r14d
+ 
+G_M000_IG14:
+       add      rsp, 8
+       pop      rbx
+       pop      r12
+       pop      r13
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 231
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Match_Visitor(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 2 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       sub      rsp, 16
+       lea      rbp, [rsp+0x10]
+       mov      gword ptr [rbp-0x10], rdi
+       mov      qword ptr [rbp-0x08], rsi
+ 
+G_M000_IG02:
+       movzx    rdi, byte  ptr [rbp-0x04]
+       cmp      edi, 1
+       je       SHORT G_M000_IG05
+ 
+G_M000_IG03:
+       cmp      edi, 2
+       je       SHORT G_M000_IG04
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag[int](ubyte):int]
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG04:
+       mov      eax, dword ptr [rbp-0x08]
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG05:
+       mov      rax, gword ptr [rbp-0x10]
+       mov      eax, dword ptr [rax+0x08]
+ 
+G_M000_IG06:
+       add      rsp, 16
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 59
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Switch_Visitor(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 2 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     rbx
+       sub      rsp, 24
+       lea      rbp, [rsp+0x20]
+       mov      gword ptr [rbp-0x18], rdi
+       mov      qword ptr [rbp-0x10], rsi
+ 
+G_M000_IG02:
+       mov      rbx, 0xD1FFAB1E
+       xor      edi, edi
+       mov      dword ptr [rbx], edi
+       movzx    rdi, byte  ptr [rbp-0x0C]
+       cmp      edi, 1
+       je       SHORT G_M000_IG05
+ 
+G_M000_IG03:
+       cmp      edi, 2
+       je       SHORT G_M000_IG04
+       call     [Unions.Pure.Csharp.Demo.DemoUnion:ThrowUnknownTag(ubyte)]
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG04:
+       mov      dword ptr [rbx], 222
+       jmp      SHORT G_M000_IG06
+ 
+G_M000_IG05:
+       mov      dword ptr [rbx], 111
+ 
+G_M000_IG06:
+       mov      eax, dword ptr [rbx]
+ 
+G_M000_IG07:
+       add      rsp, 24
+       pop      rbx
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 79
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_TryGet_Inline(Unions.Pure.Csharp.Demo.DemoUnion):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 0 single block inlinees; 2 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       sub      rsp, 16
+       lea      rbp, [rsp+0x10]
+       mov      gword ptr [rbp-0x10], rdi
+       mov      qword ptr [rbp-0x08], rsi
+ 
+G_M000_IG02:
+       movzx    rax, byte  ptr [rbp-0x04]
+       cmp      eax, 1
+       je       SHORT G_M000_IG07
+ 
+G_M000_IG03:
+       cmp      eax, 2
+       je       SHORT G_M000_IG05
+       mov      eax, -1
+ 
+G_M000_IG04:
+       add      rsp, 16
+       pop      rbp
+       ret      
+ 
+G_M000_IG05:
+       mov      eax, dword ptr [rbp-0x08]
+ 
+G_M000_IG06:
+       add      rsp, 16
+       pop      rbp
+       ret      
+ 
+G_M000_IG07:
+       mov      rax, gword ptr [rbp-0x10]
+       mov      eax, dword ptr [rax+0x08]
+ 
+G_M000_IG08:
+       add      rsp, 16
+       pop      rbp
+       ret      
+ 
+; Total bytes of code 65
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_OneOf_Match(OneOf.OneOf`2[System.String,int]):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 0 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     rbx
+       sub      rsp, 24
+       lea      rbp, [rsp+0x20]
+       mov      gword ptr [rbp-0x18], rdi
+       mov      qword ptr [rbp-0x10], rsi
+ 
+G_M000_IG02:
+       mov      rsi, 0xD1FFAB1E
+       mov      rbx, gword ptr [rsi]
+       mov      rsi, 0xD1FFAB1E
+       mov      rax, gword ptr [rsi]
+       mov      esi, dword ptr [rbp-0x0C]
+       test     esi, esi
+       je       SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       cmp      esi, 1
+       jne      SHORT G_M000_IG07
+       mov      esi, dword ptr [rbp-0x10]
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Func`2[int,int]:Invoke(int):int:this
+       jmp      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       mov      rsi, gword ptr [rbp-0x18]
+       mov      rdi, gword ptr [rbx+0x08]
+       call     [rbx+0x18]System.Func`2[System.__Canon,int]:Invoke(System.__Canon):int:this
+ 
+G_M000_IG05:
+       nop      
+ 
+G_M000_IG06:
+       add      rsp, 24
+       pop      rbx
+       pop      rbp
+       ret      
+ 
+G_M000_IG07:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       mov      rdi, rbx
+       call     [System.InvalidOperationException:.ctor():this]
+       mov      rdi, rbx
+       call     CORINFO_HELP_THROW
+       int3     
+ 
+; Total bytes of code 124
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_OneOf_Switch_NoAlloc(OneOf.OneOf`2[System.String,int]):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 0 single block inlinees; 1 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     rbx
+       sub      rsp, 16
+       lea      rbp, [rsp+0x20]
+       mov      gword ptr [rbp-0x20], rdi
+       mov      qword ptr [rbp-0x18], rsi
+ 
+G_M000_IG02:
+       mov      rbx, 0xD1FFAB1E
+       xor      esi, esi
+       mov      dword ptr [rbx], esi
+       mov      rsi, 0xD1FFAB1E
+       mov      r15, gword ptr [rsi]
+       mov      rsi, 0xD1FFAB1E
+       mov      rax, gword ptr [rsi]
+       mov      esi, dword ptr [rbp-0x14]
+       test     esi, esi
+       je       SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       cmp      esi, 1
+       jne      SHORT G_M000_IG07
+       mov      esi, dword ptr [rbp-0x18]
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       mov      rsi, gword ptr [rbp-0x20]
+       mov      rdi, gword ptr [r15+0x08]
+       call     [r15+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG05:
+       mov      eax, dword ptr [rbx]
+ 
+G_M000_IG06:
+       add      rsp, 16
+       pop      rbx
+       pop      r15
+       pop      rbp
+       ret      
+ 
+G_M000_IG07:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       mov      rdi, rbx
+       call     [System.InvalidOperationException:.ctor():this]
+       mov      rdi, rbx
+       call     CORINFO_HELP_THROW
+       int3     
+ 
+; Total bytes of code 144
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_OneOf_Switch_CapturingAlloc(OneOf.OneOf`2[System.String,int]):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 2 single block inlinees; 3 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     rbx
+       sub      rsp, 16
+       lea      rbp, [rsp+0x30]
+       mov      gword ptr [rbp-0x30], rdi
+       mov      qword ptr [rbp-0x28], rsi
+ 
+G_M000_IG02:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       xor      edi, edi
+       mov      dword ptr [rbx+0x08], edi
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r15, rax
+       mov      r14d, dword ptr [rbp-0x24]
+       lea      rdi, bword ptr [r15+0x08]
+       mov      rsi, rbx
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rdi, 0xD1FFAB1E
+       mov      qword ptr [r15+0x18], rdi
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r13, rax
+       lea      rdi, bword ptr [r13+0x08]
+       mov      rsi, rbx
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rsi, 0xD1FFAB1E
+       mov      qword ptr [r13+0x18], rsi
+       test     r14d, r14d
+       je       SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       cmp      r14d, 1
+       jne      SHORT G_M000_IG07
+       mov      esi, dword ptr [rbp-0x28]
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       mov      rsi, gword ptr [rbp-0x30]
+       mov      rdi, gword ptr [r15+0x08]
+       call     [r15+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG05:
+       mov      eax, dword ptr [rbx+0x08]
+ 
+G_M000_IG06:
+       add      rsp, 16
+       pop      rbx
+       pop      r13
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+G_M000_IG07:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       mov      rdi, rbx
+       call     [System.InvalidOperationException:.ctor():this]
+       mov      rdi, rbx
+       call     CORINFO_HELP_THROW
+       int3     
+ 
+; Total bytes of code 228
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program+<>c__DisplayClass22_0:<Asm_OneOf_Switch_CapturingAlloc>b__1(int):this (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rsp based frame
+; partially interruptible
+; No PGO data
+
+G_M000_IG01:
+ 
+G_M000_IG02:
+       mov      dword ptr [rdi+0x08], 222
+ 
+G_M000_IG03:
+       ret      
+ 
+; Total bytes of code 8
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_OneOf_MatchAndSwitch(int):int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 4 single block inlinees; 2 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     r12
+       push     rbx
+       push     rax
+       lea      rbp, [rsp+0x30]
+ 
+G_M000_IG02:
+       test     dil, 1
+       jne      SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       mov      rbx, 0xD1FFAB1E
+       xor      r15d, r15d
+       xor      r14d, r14d
+       jmp      SHORT G_M000_IG05
+ 
+G_M000_IG04:
+       xor      rbx, rbx
+       mov      r15d, 7
+       mov      r14d, 1
+ 
+G_M000_IG05:
+       mov      rsi, 0xD1FFAB1E
+       mov      r13, gword ptr [rsi]
+       mov      rsi, 0xD1FFAB1E
+       mov      rax, gword ptr [rsi]
+       test     r14d, r14d
+       je       SHORT G_M000_IG07
+ 
+G_M000_IG06:
+       cmp      r14d, 1
+       jne      SHORT G_M000_IG13
+       mov      esi, r15d
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Func`2[int,int]:Invoke(int):int:this
+       mov      r12d, eax
+       jmp      SHORT G_M000_IG08
+ 
+G_M000_IG07:
+       mov      rsi, rbx
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Func`2[System.__Canon,int]:Invoke(System.__Canon):int:this
+       mov      r12d, eax
+ 
+G_M000_IG08:
+       mov      rsi, 0xD1FFAB1E
+       mov      r13, gword ptr [rsi]
+       mov      rsi, 0xD1FFAB1E
+       mov      rax, gword ptr [rsi]
+       test     r14d, r14d
+       je       SHORT G_M000_IG10
+ 
+G_M000_IG09:
+       cmp      r14d, 1
+       jne      SHORT G_M000_IG14
+       mov      esi, r15d
+       mov      rdi, gword ptr [rax+0x08]
+       call     [rax+0x18]System.Action`1[int]:Invoke(int):this
+       jmp      SHORT G_M000_IG11
+ 
+G_M000_IG10:
+       mov      rsi, rbx
+       mov      rdi, gword ptr [r13+0x08]
+       call     [r13+0x18]System.Action`1[System.__Canon]:Invoke(System.__Canon):this
+ 
+G_M000_IG11:
+       mov      eax, r12d
+ 
+G_M000_IG12:
+       add      rsp, 8
+       pop      rbx
+       pop      r12
+       pop      r13
+       pop      r14
+       pop      r15
+       pop      rbp
+       ret      
+ 
+G_M000_IG13:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       mov      rdi, rbx
+       call     [System.InvalidOperationException:.ctor():this]
+       mov      rdi, rbx
+       call     CORINFO_HELP_THROW
+       int3     
+ 
+G_M000_IG14:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      rbx, rax
+       mov      rdi, rbx
+       call     [System.InvalidOperationException:.ctor():this]
+       mov      rdi, rbx
+       call     CORINFO_HELP_THROW
+       int3     
+ 
+; Total bytes of code 270
+
+; Assembly listing for method Unions.Pure.Csharp.Demo.Program:Asm_Json_WithResolver():int (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 15 single block inlinees; 0 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     r14
+       push     r13
+       push     rbx
+       sub      rsp, 32
+       lea      rbp, [rsp+0x40]
+       vxorps   xmm8, xmm8, xmm8
+       vmovdqu  xmmword ptr [rbp-0x38], xmm8
+       xor      eax, eax
+       mov      qword ptr [rbp-0x28], rax
+ 
+G_M000_IG02:
+       mov      rdi, 0xD1FFAB1E
+       mov      esi, 3
+       call     CORINFO_HELP_NEWARR_1_VC
+       mov      rbx, rax
+       mov      rdi, 0xD1FFAB1E
+       mov      rsi, qword ptr [rdi]
+       mov      qword ptr [rbx+0x10], rsi
+       mov      esi, dword ptr [rdi+0x08]
+       mov      dword ptr [rbx+0x18], esi
+       mov      rdi, 0xD1FFAB1E
+       mov      esi, 2
+       call     CORINFO_HELP_NEWARR_1_OBJ
+       mov      r15, rax
+       mov      r14, 0xD1FFAB1E
+       mov      rdi, r14
+       call     CORINFO_HELP_NEWSFAST
+       mov      dword ptr [rax+0x10], 1
+       mov      rdi, 0xD1FFAB1E
+       mov      gword ptr [rax+0x08], rdi
+       lea      rdi, bword ptr [r15+0x10]
+       mov      rsi, rax
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rdi, r14
+       call     CORINFO_HELP_NEWSFAST
+       mov      dword ptr [rax+0x10], 2
+       mov      rdi, 0xD1FFAB1E
+       mov      gword ptr [rax+0x08], rdi
+       lea      rdi, bword ptr [r15+0x18]
+       mov      rsi, rax
+       call     CORINFO_HELP_ASSIGN_REF
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r13, rax
+       mov      rdi, r13
+       xor      esi, esi
+       xor      rdx, rdx
+       call     [System.Collections.Generic.Dictionary`2[System.__Canon,System.__Canon]:.ctor(int,System.Collections.Generic.IEqualityComparer`1[System.__Canon]):this]
+       mov      rdi, r14
+       call     CORINFO_HELP_NEWSFAST
+       mov      dword ptr [rax+0x10], 9
+       mov      rdi, 0xD1FFAB1E
+       mov      gword ptr [rax+0x08], rdi
+       mov      rdi, r13
+       mov      rdx, rax
+       mov      rsi, 0xD1FFAB1E
+       mov      ecx, 1
+       call     [System.Collections.Generic.Dictionary`2[System.__Canon,System.__Canon]:TryInsert(System.__Canon,System.__Canon,ubyte):ubyte:this]
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_NEWSFAST
+       mov      r14, rax
+       mov      rdi, 0xD1FFAB1E
+       mov      gword ptr [r14+0x08], rdi
+       lea      rdi, bword ptr [r14+0x10]
+       mov      rsi, rbx
+       call     CORINFO_HELP_ASSIGN_REF
+       lea      rdi, bword ptr [r14+0x18]
+       mov      rsi, r15
+       call     CORINFO_HELP_ASSIGN_REF
+       lea      rdi, bword ptr [r14+0x20]
+       mov      rsi, r13
+       call     CORINFO_HELP_ASUnhandled exception. System.NotSupportedException: JsonTypeInfo metadata for type 'Unions.Pure.Csharp.Demo.JsonDemoUnion' was not provided by TypeInfoResolver of type 'Unions.Pure.Csharp.Demo.DemoJsonContext'. If using source generation, ensure that all root types passed to the serializer have been annotated with 'JsonSerializableAttribute', along with any types that might be serialized polymorphically.
+   at System.Text.Json.ThrowHelper.ThrowNotSupportedException_NoMetadataForType(Type type, IJsonTypeInfoResolver resolver)
+   at System.Text.Json.JsonSerializerOptions.GetTypeInfoInternal(Type type, Boolean ensureConfigured, Nullable`1 ensureNotNull, Boolean resolveIfMutable, Boolean fallBackToNearestAncestorType)
+   at System.Text.Json.JsonSerializer.GetTypeInfo[T](JsonSerializerOptions options)
+   at Unions.Pure.Csharp.Demo.Program.Asm_Json_WithResolver() in /home/boogie/stuff/repos/unions-pure-csharp/Unions.Pure.Csharp.Demo/Program.cs:line 179
+   at Unions.Pure.Csharp.Demo.Program.Main(String[] args) in /home/boogie/stuff/repos/unions-pure-csharp/Unions.Pure.Csharp.Demo/Program.cs:line 54

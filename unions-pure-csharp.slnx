@@ -1,0 +1,5 @@
+﻿<Solution>
+  <Project Path="Unions.Pure.Csharp.SourceGenerator/Unions.Pure.Csharp.SourceGenerator.csproj" Type="Classic C#" />
+  <Project Path="Unions.Pure.Csharp.Tests/Unions.Pure.Csharp.Tests.csproj" Type="Classic C#" />
+  <Project Path="Unions.Pure.Csharp.Demo/Unions.Pure.Csharp.Demo.csproj" Type="Classic C#" />
+</Solution>

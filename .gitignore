@@ -1,0 +1,13 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea
+.logs/
+.nuget/
+.dotnet/
+nohup.out
+.nix-rider
+.vscode/
+clickhouse-pure.sln.DotSettings.user

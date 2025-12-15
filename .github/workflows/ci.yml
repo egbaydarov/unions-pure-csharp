@@ -1,0 +1,74 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore unions-pure-csharp.slnx
+
+      - name: Build
+        run: dotnet build unions-pure-csharp.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test unions-pure-csharp.slnx --configuration Release --no-build
+
+  publish-nuget:
+    needs: test
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Derive package version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [ -z "${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not contain a semantic version value" >&2
+            exit 1
+          fi
+          echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore unions-pure-csharp.slnx
+
+      - name: Pack
+        run: dotnet pack Unions.Pure.Csharp.SourceGenerator/Unions.Pure.Csharp.SourceGenerator.csproj --configuration Release -p:ContinuousIntegrationBuild=true -p:PackageVersion=${{ steps.version.outputs.value }} --output artifacts
+
+      - name: Push package to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "NUGET_API_KEY secret is not configured" >&2
+            exit 1
+          fi
+          dotnet nuget push "artifacts/Unions.Pure.Csharp.${{ steps.version.outputs.value }}.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_API_KEY}" --skip-duplicate
+

@@ -1,0 +1,102 @@
+; Assembly listing for method System.Text.Json.JsonSerializer:GetTypeInfo[Unions.Pure.Csharp.Demo.JsonDemoUnion](System.Text.Json.JsonSerializerOptions):System.Text.Json.Serialization.Metadata.JsonTypeInfo`1[Unions.Pure.Csharp.Demo.JsonDemoUnion] (FullOpts)
+; Emitting BLENDED_CODE for X64 with AVX512 - Unix
+; FullOpts code
+; optimized code
+; rbp based frame
+; partially interruptible
+; No PGO data
+; 0 inlinees with PGO data; 2 single block inlinees; 3 inlinees without PGO data
+
+G_M000_IG01:
+       push     rbp
+       push     r15
+       push     rbx
+       sub      rsp, 16
+       lea      rbp, [rsp+0x20]
+ 
+G_M000_IG02:
+       mov      rbx, rdi
+       test     rbx, rbx
+       jne      SHORT G_M000_IG04
+ 
+G_M000_IG03:
+       call     [System.Text.Json.JsonSerializerOptions:get_Default():System.Text.Json.JsonSerializerOptions]
+       mov      rbx, rax
+ 
+G_M000_IG04:
+       cmp      byte  ptr [rbx+0x9E], 0
+       jne      SHORT G_M000_IG06
+ 
+G_M000_IG05:
+       mov      rdi, rbx
+       call     [System.Text.Json.JsonSerializerOptions:ConfigureForJsonSerializer():this]
+ 
+G_M000_IG06:
+       test     byte  ptr [(reloc)], 1
+       je       G_M000_IG15
+ 
+G_M000_IG07:
+       mov      rcx, 0xD1FFAB1E
+       mov      rsi, 0xD1FFAB1E
+       cmp      gword ptr [rcx], rsi
+       je       SHORT G_M000_IG11
+ 
+G_M000_IG08:
+       mov      r15, gword ptr [rbx+0x10]
+       test     r15, r15
+       je       SHORT G_M000_IG09
+       mov      rcx, gword ptr [r15+0xB8]
+       cmp      rcx, rsi
+       je       SHORT G_M000_IG10
+ 
+G_M000_IG09:
+       mov      byte  ptr [rbp-0x18], 1
+       mov      byte  ptr [rbp-0x17], 1
+       movzx    rcx, word  ptr [rbp-0x18]
+       mov      rdi, rbx
+       xor      r9d, r9d
+       mov      edx, 1
+       xor      r8d, r8d
+       call     [System.Text.Json.JsonSerializerOptions:GetTypeInfoInternal(System.Type,ubyte,System.Nullable`1[ubyte],ubyte,ubyte):System.Text.Json.Serialization.Metadata.JsonTypeInfo:this]
+       mov      r15, rax
+       lea      rdi, bword ptr [rbx+0x10]
+       mov      rsi, r15
+       call     CORINFO_HELP_ASSIGN_REF
+ 
+G_M000_IG10:
+       jmp      SHORT G_M000_IG12
+ 
+G_M000_IG11:
+       mov      rdi, rbx
+       call     [System.Text.Json.JsonSerializerOptions:get_ObjectTypeInfo():System.Text.Json.Serialization.Metadata.JsonTypeInfo:this]
+       mov      r15, rax
+ 
+G_M000_IG12:
+       mov      rax, r15
+       test     rax, rax
+       je       SHORT G_M000_IG14
+ 
+G_M000_IG13:
+       mov      rdi, 0xD1FFAB1E
+       cmp      qword ptr [rax], rdi
+       jne      SHORT G_M000_IG16
+ 
+G_M000_IG14:
+       add      rsp, 16
+       pop      rbx
+       pop      r15
+       pop      rbp
+       ret      
+ 
+G_M000_IG15:
+       mov      rdi, 0xD1FFAB1E
+       call     CORINFO_HELP_GET_GCSTATIC_BASE
+       jmp      G_M000_IG07
+ 
+G_M000_IG16:
+       mov      rsi, r15
+       call     CORINFO_HELP_CHKCASTCLASS
+       int3     
+ 
+; Total bytes of code 229
+
