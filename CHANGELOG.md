@@ -1,4 +1,12 @@
 ## Changelog
+<a name="2.0.1"></a>
+## [2.0.1](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.0...v2.0.1) (2025-12-18)
+
+### Not Important
+
+* vibe updates ([81a12a0](https://github.com/egbaydarov/unions-pure-csharp/commit/81a12a0e49ce1031e70d9ffe2167a9c04a77a0f5))
+* clean up ([ae2fda0](https://github.com/egbaydarov/unions-pure-csharp/commit/ae2fda0f9c701eb508e95da235b0d8b501b221a2))
+
 <a name="2.0.0"></a>
 ## [2.0.0](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.0...v2.0.0) (2025-12-15)
 
