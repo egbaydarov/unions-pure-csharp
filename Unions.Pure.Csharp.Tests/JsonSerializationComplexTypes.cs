@@ -11,21 +11,27 @@ public sealed record ComplexPayload(
     Dictionary<string, InnerItem> Map,
     int? Optional);
 
-[UnionMember(typeof(ComplexPayload), "Payload")]
-[UnionMember(typeof(int[]), "Numbers")]
-[UnionMember(typeof(string), "Message")]
-[UnionGenerator(GenerateTarget.TryOut)]
-[UnionSerializationContext(typeof(ApiJsonComplexSerializationContext), caseInsensitivePropertyNameMatching: true)]
-public partial record class JsonComplexUnion;
+[Union(GenerateTarget.TryOut)]
+public partial record class JsonComplexUnion
+{
+    [JsonInclude]
+    [UnionMember("Payload")]
+    internal ComplexPayload? Payload { get; init; }
+
+    [JsonInclude]
+    [UnionMember("Numbers")]
+    internal int[]? Numbers { get; init; }
+
+    [JsonInclude]
+    [UnionMember("Message")]
+    internal string? Message { get; init; }
+}
 
 [JsonSourceGenerationOptions(
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     WriteIndented = false,
     GenerationMode = JsonSourceGenerationMode.Default)]
-[JsonSerializable(typeof(ComplexPayload))]
-[JsonSerializable(typeof(int[]))]
-[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(JsonComplexUnion))]
 public partial class ApiJsonComplexSerializationContext : JsonSerializerContext;
-
 

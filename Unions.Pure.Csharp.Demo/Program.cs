@@ -7,28 +7,28 @@ namespace Unions.Pure.Csharp.Demo;
 
 internal static class Program
 {
-    private static readonly Func<string, int> OnStringLen = static s => s.Length;
-    private static readonly Func<int, int> OnIntIdentity = static i => i;
+    private static readonly Func<string?, int> OnStringLen = static s => s!.Length;
+    private static readonly Func<int?, int> OnIntIdentity = static i => i!.Value;
 
-    private static readonly Action<string> OnStringNoop = static _ => { };
-    private static readonly Action<int> OnIntNoop = static _ => { };
+    private static readonly Action<string?> OnStringNoop = static _ => { };
+    private static readonly Action<int?> OnIntNoop = static _ => { };
 
     private readonly struct DemoUnionMatchVisitor : DemoUnion.IMatchVisitor<int>
     {
-        public int OnString(string value) => value.Length;
-        public int OnInt32(int value) => value;
+        public int OnString(string? value) => value!.Length;
+        public int OnInt32(int? value) => value!.Value;
     }
 
     private readonly struct DemoUnionSwitchVisitor : DemoUnion.ISwitchVisitor
     {
-        public void OnString(string value) => s_switchSink = 111;
-        public void OnInt32(int value) => s_switchSink = 222;
+        public void OnString(string? value) => s_switchSink = 111;
+        public void OnInt32(int? value) => s_switchSink = 222;
     }
 
     // Used to demonstrate allocation-free Switch (no capturing lambdas).
     private static int s_switchSink;
-    private static readonly Action<string> OnStringSet111 = static _ => s_switchSink = 111;
-    private static readonly Action<int> OnIntSet222 = static _ => s_switchSink = 222;
+    private static readonly Action<string?> OnStringSet111 = static _ => s_switchSink = 111;
+    private static readonly Action<int?> OnIntSet222 = static _ => s_switchSink = 222;
 
     private static int s_oneOfSwitchSink;
     private static readonly Action<string> OnStringSet111_OneOf = static _ => s_oneOfSwitchSink = 111;
@@ -86,7 +86,7 @@ internal static class Program
             return s.Length;
 
         if (u.TryGetInt32(out var i))
-            return i;
+            return i!.Value;
 
         return -1;
     }
@@ -128,7 +128,7 @@ internal static class Program
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int Asm_OneOf_Match(OneOf<string, int> u)
-        => u.Match(OnStringLen, OnIntIdentity);
+        => u.Match(s => s.Length, i => i);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static int Asm_OneOf_Switch_NoAlloc(OneOf<string, int> u)
@@ -153,8 +153,8 @@ internal static class Program
     private static int Asm_OneOf_MatchAndSwitch(int x)
     {
         OneOf<string, int> u = (x & 1) == 0 ? "world" : 7;
-        var a = u.Match(OnStringLen, OnIntIdentity);
-        u.Switch(OnStringNoop, OnIntNoop);
+        var a = u.Match(s => s.Length, i => i);
+        u.Switch(_ => { }, _ => { });
         return a;
     }
 
@@ -163,16 +163,17 @@ internal static class Program
     {
         var payload = new ComplexPayload(
             Title: "t",
-            Numbers: new[] { 1, 2, 3 },
+            Numbers: [ 1, 2, 3 ],
             Items: new[] { new InnerItem(1, "a"), new InnerItem(2, "b") },
             Map: new Dictionary<string, InnerItem> { ["k"] = new InnerItem(9, "z") },
             Optional: null);
 
+        var ctx = DemoJsonContext.Default;
         var u = JsonDemoUnion.FromPayload(payload);
-        var bytes = u.ToUtf8Bytes();
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(u, ctx.JsonDemoUnion);
 
         // Roundtrip (also keeps the JIT from dead-code eliminating JSON work).
-        var back = JsonDemoUnion.FromUtf8Bytes(bytes);
+        var back = JsonSerializer.Deserialize(bytes, ctx.JsonDemoUnion);
         if (!back.TryGetPayload(out _))
             return -1;
 
@@ -184,7 +185,7 @@ internal static class Program
     {
         var payload = new ComplexPayload(
             Title: "t",
-            Numbers: new[] { 1, 2, 3 },
+            Numbers: [1, 2, 3],
             Items: new[] { new InnerItem(1, "a"), new InnerItem(2, "b") },
             Map: new Dictionary<string, InnerItem> { ["k"] = new InnerItem(9, "z") },
             Optional: null);

@@ -1,9 +1,16 @@
-using Unions.Pure.Csharp;
+using System.Text.Json.Serialization;
 
 namespace Unions.Pure.Csharp.Demo;
 
-[UnionMember(typeof(string))]
-[UnionMember(typeof(int))]
-public partial record struct DemoUnion;
+[Union]
+public partial record struct DemoUnion
+{
+    [JsonInclude]
+    [UnionMember]
+    internal string? String { get; init; }
 
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
 

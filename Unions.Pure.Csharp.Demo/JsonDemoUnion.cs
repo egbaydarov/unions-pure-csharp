@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using Unions.Pure.Csharp;
 
 namespace Unions.Pure.Csharp.Demo;
 
@@ -13,11 +11,17 @@ public sealed record ComplexPayload(
     Dictionary<string, InnerItem> Map,
     int? Optional);
 
-[UnionMember(typeof(ComplexPayload), "Payload")]
-[UnionMember(typeof(string), "Message")]
-[UnionGenerator(GenerateTarget.TryOut)]
-[UnionSerializationContext(typeof(DemoJsonContext), caseInsensitivePropertyNameMatching: true)]
-public partial record struct JsonDemoUnion;
+[Union(GenerateTarget.TryOut)]
+public partial record struct JsonDemoUnion
+{
+    [JsonInclude]
+    [UnionMember("Payload")]
+    internal ComplexPayload? Payload { get; init; }
+
+    [JsonInclude]
+    [UnionMember("Message")]
+    internal string? Message { get; init; }
+}
 
 [JsonSourceGenerationOptions(
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -26,10 +30,7 @@ public partial record struct JsonDemoUnion;
     GenerationMode = JsonSourceGenerationMode.Default)]
 [JsonSerializable(typeof(ComplexPayload))]
 [JsonSerializable(typeof(InnerItem))]
-[JsonSerializable(typeof(int[]))]
-[JsonSerializable(typeof(InnerItem[]))]
-[JsonSerializable(typeof(Dictionary<string, InnerItem>))]
-[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(JsonDemoUnion))]
 public partial class DemoJsonContext : JsonSerializerContext;
 
 

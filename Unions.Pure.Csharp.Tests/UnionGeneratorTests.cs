@@ -1,14 +1,23 @@
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
-using System.Text;
+using AwesomeAssertions;
 using Xunit;
 
 namespace Unions.Pure.Csharp.Tests;
 
 public class UnionGeneratorTests
 {
+    private static readonly JsonSerializerOptions options = new()
+    {
+        WriteIndented = false
+    };
+
+    private static string NormalizeJson(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return JsonSerializer.Serialize(doc.RootElement, options);
+    }
+
     private sealed class Context<T>(T value)
     {
         public T Value { get; set; } = value;
@@ -16,21 +25,21 @@ public class UnionGeneratorTests
 
     private readonly struct SampleUnionMatchVisitor : SampleUnion.IMatchVisitor<string>
     {
-        public string OnString(string value) => "S:" + value;
-        public string OnInt32(int value) => "I:" + value.ToString(CultureInfo.InvariantCulture);
+        public string OnString(string? value) => "S:" + value;
+        public string OnInt32(int? value) => "I:" + value?.ToString(CultureInfo.InvariantCulture) ?? "null";
     }
 
     private readonly struct SampleUnionSwitchVisitor(Context<int> context) : SampleUnion.ISwitchVisitor
     {
-        public void OnString(string value) => context.Value = value.Length;
-        public void OnInt32(int value) => context.Value = value;
+        public void OnString(string? value) => context.Value = value?.Length ?? 0;
+        public void OnInt32(int? value) => context.Value = value ?? 0;
     }
 
     private readonly struct DuplicateTypeUnionMatchVisitor : DuplicateTypeUnion.IMatchVisitor<string>
     {
-        public string OnString1(string value) => "S1:" + value;
-        public string OnString2(string value) => "S2:" + value;
-        public string OnInt32(int value) => "I:" + value.ToString(CultureInfo.InvariantCulture);
+        public string OnString1(string? value) => "S1:" + value;
+        public string OnString2(string? value) => "S2:" + value;
+        public string OnInt32(int? value) => "I:" + value?.ToString(CultureInfo.InvariantCulture) ?? "null";
     }
 
     [Fact]
@@ -38,13 +47,17 @@ public class UnionGeneratorTests
     {
         var union = SampleUnion.FromString("hello");
 
-        Assert.Equal(SampleUnion.UnionTag.String, union.Tag);
+        union.Tag
+            .Should()
+            .Be(SampleUnion.UnionTag.String);
 
         var result = union.Match(
-            onString: s => s.ToUpperInvariant(),
-            onInt32: n => n.ToString(CultureInfo.InvariantCulture));
+            onString: s => s?.ToUpperInvariant() ?? "",
+            onInt32: n => n?.ToString(CultureInfo.InvariantCulture) ?? "");
 
-        Assert.Equal("HELLO", result);
+        result
+            .Should()
+            .Be("HELLO");
     }
 
     [Fact]
@@ -54,14 +67,18 @@ public class UnionGeneratorTests
         var handled = false;
 
         union.Switch(
-            onString: _ => Assert.Fail("String branch should not be taken."),
+            onString: _ => throw new InvalidOperationException("String branch should not be taken."),
             onInt32: n =>
             {
                 handled = true;
-                Assert.Equal(7, n);
+                n
+                    .Should()
+                    .Be(7);
             });
 
-        Assert.True(handled);
+        handled
+            .Should()
+            .BeTrue();
     }
 
     [Fact]
@@ -71,35 +88,49 @@ public class UnionGeneratorTests
         var u2 = DuplicateTypeUnion.FromString2("bb");
         var u3 = DuplicateTypeUnion.FromInt32(5);
 
-        Assert.Equal(DuplicateTypeUnion.UnionTag.String1, u1.Tag);
-        Assert.Equal(DuplicateTypeUnion.UnionTag.String2, u2.Tag);
-        Assert.Equal(DuplicateTypeUnion.UnionTag.Int32, u3.Tag);
+        u1.Tag
+            .Should()
+            .Be(DuplicateTypeUnion.UnionTag.String1);
+        u2.Tag
+            .Should()
+            .Be(DuplicateTypeUnion.UnionTag.String2);
+        u3.Tag
+            .Should()
+            .Be(DuplicateTypeUnion.UnionTag.Int32);
 
         var r1 = u1.Match(
             onString1: s => "S1:" + s,
             onString2: s => "S2:" + s,
-            onInt32: n => "I:" + n.ToString(CultureInfo.InvariantCulture));
-        Assert.Equal("S1:a", r1);
+            onInt32: n => "I:" + (n?.ToString(CultureInfo.InvariantCulture) ?? "null"));
+        r1
+            .Should()
+            .Be("S1:a");
 
         var r2 = u2.Match(
             onString1: s => "S1:" + s,
             onString2: s => "S2:" + s,
-            onInt32: n => "I:" + n.ToString(CultureInfo.InvariantCulture));
-        Assert.Equal("S2:bb", r2);
+            onInt32: n => "I:" + (n?.ToString(CultureInfo.InvariantCulture) ?? "null"));
+        r2
+            .Should()
+            .Be("S2:bb");
 
         var handled = 0;
         u3.Switch(
             onString1: _ => handled = 1,
             onString2: _ => handled = 2,
             onInt32: _ => handled = 3);
-        Assert.Equal(3, handled);
+        handled
+            .Should()
+            .Be(3);
     }
 
     [Fact]
     public void Ten_custom_types_union_generates_and_matches()
     {
         var u = TenCustomTypesUnion.FromC7(new C7());
-        Assert.Equal(TenCustomTypesUnion.UnionTag.C7, u.Tag);
+        u.Tag
+            .Should()
+            .Be(TenCustomTypesUnion.UnionTag.C7);
 
         var r = u.Match(
             onC0: _ => 0,
@@ -112,7 +143,9 @@ public class UnionGeneratorTests
             onC7: _ => 7,
             onC8: _ => 8,
             onC9: _ => 9);
-        Assert.Equal(7, r);
+        r
+            .Should()
+            .Be(7);
     }
 
     [Fact]
@@ -123,44 +156,72 @@ public class UnionGeneratorTests
 
         var ms = s.Match<SampleUnionMatchVisitor, string>(default);
         var mi = i.Match<SampleUnionMatchVisitor, string>(default);
-        Assert.Equal("S:abcd", ms);
-        Assert.Equal("I:123", mi);
+        ms
+            .Should()
+            .Be("S:abcd");
+        mi
+            .Should()
+            .Be("I:123");
 
         var context = new Context<int>(-1);
         s.Switch(new SampleUnionSwitchVisitor(context));
-        Assert.Equal(4, context.Value);
+        context.Value
+            .Should()
+            .Be(4);
         i.Switch(new SampleUnionSwitchVisitor(context));
-        Assert.Equal(123, context.Value);
+        context.Value
+            .Should()
+            .Be(123);
     }
 
     [Fact]
     public void TryGet_and_Is_helpers_work_including_duplicate_types()
     {
         var s = SampleUnion.FromString("hi");
-        Assert.True(s.IsString());
-        Assert.False(s.IsInt32());
-        Assert.True(s.TryGetString(out var str));
-        Assert.Equal("hi", str);
-        Assert.False(s.TryGetInt32(out _));
+        s.IsString()
+            .Should()
+            .BeTrue();
+        s.IsInt32()
+            .Should()
+            .BeFalse();
+        s.TryGetString(out var str)
+            .Should()
+            .BeTrue();
+        str
+            .Should()
+            .Be("hi");
+        s.TryGetInt32(out _)
+            .Should()
+            .BeFalse();
 
         var du = DuplicateTypeUnion.FromString2("x");
-        Assert.True(du.IsString2());
-        Assert.False(du.IsString1());
-        Assert.True(du.TryGetString2(out var s2));
-        Assert.Equal("x", s2);
-        Assert.False(du.TryGetString1(out _));
+        du.IsString2()
+            .Should()
+            .BeTrue();
+        du.IsString1()
+            .Should()
+            .BeFalse();
+        du.TryGetString2(out var s2)
+            .Should()
+            .BeTrue();
+        s2
+            .Should()
+            .Be("x");
+        du.TryGetString1(out _)
+            .Should()
+            .BeFalse();
 
         var r = du.Match<DuplicateTypeUnionMatchVisitor, string>(default);
-        Assert.Equal("S2:x", r);
+        r
+            .Should()
+            .Be("S2:x");
     }
 
     [Fact]
     public void UnionGenerator_flags_control_emitted_apis()
     {
-        // We validate by inspecting the generated .g.cs text (compile-time shaping).
         static string ReadGenerated(string typeName)
         {
-            // bin/{cfg}/{tfm}/ -> project/obj/Generated/**/Type.Union.g.cs
             var baseDir = AppContext.BaseDirectory;
             var projectDir = Path.GetFullPath(Path.Combine(baseDir, "..", "..", ".."));
             var objGenerated = Path.Combine(projectDir, "obj", "Generated");
@@ -169,124 +230,319 @@ public class UnionGeneratorTests
         }
 
         var tryOnly = ReadGenerated(nameof(TryOnlyUnion));
-        Assert.Contains("TryGetString", tryOnly);
-        Assert.DoesNotContain("public T Match<T>(", tryOnly);
-        Assert.DoesNotContain("public interface IMatchVisitor", tryOnly);
+        tryOnly
+            .Should()
+            .Contain("TryGetString");
+        tryOnly
+            .Should()
+            .NotContain("public T Match<T>(");
+        tryOnly
+            .Should()
+            .NotContain("public interface IMatchVisitor");
 
         var visitorOnly = ReadGenerated(nameof(VisitorOnlyUnion));
-        Assert.Contains("public interface IMatchVisitor", visitorOnly);
-        Assert.Contains("public TResult Match<TVisitor, TResult>", visitorOnly);
-        Assert.DoesNotContain("public T Match<T>(", visitorOnly);
-        Assert.DoesNotContain("TryGetString", visitorOnly);
+        visitorOnly
+            .Should()
+            .Contain("public interface IMatchVisitor");
+        visitorOnly
+            .Should()
+            .Contain("public TResult Match<TVisitor, TResult>");
+        visitorOnly
+            .Should()
+            .NotContain("public T Match<T>(");
+        visitorOnly
+            .Should()
+            .NotContain("TryGetString");
 
         var indirectOnly = ReadGenerated(nameof(IndirectOnlyUnion));
-        Assert.Contains("public T Match<T>(", indirectOnly);
-        Assert.Contains("public void Switch(", indirectOnly);
-        Assert.DoesNotContain("public interface IMatchVisitor", indirectOnly);
-        Assert.DoesNotContain("TryGetString", indirectOnly);
+        indirectOnly
+            .Should()
+            .Contain("public T Match<T>(");
+        indirectOnly
+            .Should()
+            .Contain("public void Switch(");
+        indirectOnly
+            .Should()
+            .NotContain("public interface IMatchVisitor");
+        indirectOnly
+            .Should()
+            .NotContain("TryGetString");
     }
 
     [Fact]
-    public void Union_serialization_ToUtf8Bytes_and_FromUtf8Bytes_roundtrip_and_is_case_insensitive()
+    public void Union_serialization_STJ_roundtrip()
     {
+        var ctx = ApiJsonSerializationContext.Default;
+
         var u = JsonTestUnion.FromString2("hello");
-        var bytes = u.ToUtf8Bytes();
-        var json = System.Text.Encoding.UTF8.GetString(bytes);
-        Assert.Equal("{\"string2\":\"hello\"}", json);
+        var json = JsonSerializer.Serialize(u, ctx.JsonTestUnion);
+        var normalizedJson = NormalizeJson(json);
 
-        var back = JsonTestUnion.FromUtf8Bytes(bytes);
-        Assert.Equal(JsonTestUnion.UnionTag.String2, back.Tag);
-        Assert.True(back.TryGetString2(out var s2));
-        Assert.Equal("hello", s2);
+        var expectedJson = NormalizeJson("""
+        {
+          "string2": "hello"
+        }
+        """);
 
-        // case-insensitive key matching
-        var backUpper = JsonTestUnion.FromUtf8Bytes(System.Text.Encoding.UTF8.GetBytes("{\"STRING2\":\"hello\"}"));
-        Assert.Equal(JsonTestUnion.UnionTag.String2, backUpper.Tag);
-        Assert.True(backUpper.TryGetString2(out var s2b));
-        Assert.Equal("hello", s2b);
+        normalizedJson
+            .Should()
+            .Be(expectedJson);
+
+        var back = JsonSerializer.Deserialize(json, ctx.JsonTestUnion);
+        back
+            .Should()
+            .NotBeNull();
+        back.TryGetString2(out var s)
+            .Should()
+            .BeTrue();
+        s
+            .Should()
+            .Be("hello");
 
         var u2 = JsonTestUnion.FromInt32(7);
-        var bytes2 = u2.ToUtf8Bytes();
-        var json2 = System.Text.Encoding.UTF8.GetString(bytes2);
-        Assert.Equal("{\"int32\":7}", json2);
+        var json2 = JsonSerializer.Serialize(u2, ctx.JsonTestUnion);
+        var normalizedJson2 = NormalizeJson(json2);
 
-        var back2 = JsonTestUnion.FromUtf8Bytes(bytes2);
-        Assert.Equal(JsonTestUnion.UnionTag.Int32, back2.Tag);
-        Assert.True(back2.TryGetInt32(out var i));
-        Assert.Equal(7, i);
+        var expectedJson2 = NormalizeJson("""
+        {
+          "int32": 7
+        }
+        """);
+
+        normalizedJson2
+            .Should()
+            .Be(expectedJson2);
+
+        var back2 = JsonSerializer.Deserialize(json2, ctx.JsonTestUnion);
+        back2
+            .Should()
+            .NotBeNull();
+        back2.TryGetInt32(out var i)
+            .Should()
+            .BeTrue();
+        i
+            .Should()
+            .Be(7);
     }
 
     [Fact]
-    public void Union_serialization_can_be_configured_to_be_case_sensitive_on_deserialize()
+    public void Union_serialization_STJ_case_sensitive()
     {
+        var ctx = ApiJsonSerializationContext.Default;
         var u = JsonTestUnionCaseSensitive.FromString2("hello");
-        var bytes = u.ToUtf8Bytes();
+        var json = JsonSerializer.Serialize(u, ctx.JsonTestUnionCaseSensitive);
+        var normalizedJson = NormalizeJson(json);
 
-        // Matches exact tag name and naming-policy variant, but not different casing.
-        var back1 = JsonTestUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"String2\":\"hello\"}"));
-        Assert.Equal(JsonTestUnionCaseSensitive.UnionTag.String2, back1.Tag);
+        var expectedJson = NormalizeJson("""
+        {
+          "string2": "hello"
+        }
+        """);
 
-        var back2 = JsonTestUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"string2\":\"hello\"}"));
-        Assert.Equal(JsonTestUnionCaseSensitive.UnionTag.String2, back2.Tag);
+        normalizedJson
+            .Should()
+            .Be(expectedJson);
 
-        Assert.Throws<JsonException>(() =>
-            JsonTestUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"STRING2\":\"hello\"}")));
+        var back = JsonSerializer.Deserialize(json, ctx.JsonTestUnionCaseSensitive);
+        back
+            .Should()
+            .NotBeNull();
+        back.Tag
+            .Should()
+            .Be(JsonTestUnionCaseSensitive.UnionTag.String2);
     }
 
     [Fact]
-    public void Union_serialization_case_sensitive_still_accepts_naming_policy_variant_payload_to_payload()
+    public void Union_serialization_STJ_payload()
     {
+        var ctx = ApiJsonSerializationContext.Default;
         var u = JsonPayloadUnionCaseSensitive.FromPayload(7);
-        var bytes = u.ToUtf8Bytes();
-        var json = Encoding.UTF8.GetString(bytes);
+        var json = JsonSerializer.Serialize(u, ctx.JsonPayloadUnionCaseSensitive);
+        var normalizedJson = NormalizeJson(json);
 
-        // CamelCase policy on the context: "Payload" -> "payload" on the wire.
-        Assert.Equal("{\"payload\":7}", json);
+        var expectedJson = NormalizeJson("""
+        {
+          "payload": 7
+        }
+        """);
 
-        // Case-sensitive matching still accepts:
-        // - raw tag name ("Payload")
-        // - naming-policy converted name ("payload")
-        var back1 = JsonPayloadUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"Payload\":7}"));
-        Assert.True(back1.TryGetPayload(out var p1));
-        Assert.Equal(7, p1);
+        normalizedJson
+            .Should()
+            .Be(expectedJson);
 
-        var back2 = JsonPayloadUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"payload\":7}"));
-        Assert.True(back2.TryGetPayload(out var p2));
-        Assert.Equal(7, p2);
-
-        // But not different casing.
-        Assert.Throws<JsonException>(() =>
-            JsonPayloadUnionCaseSensitive.FromUtf8Bytes(Encoding.UTF8.GetBytes("{\"PAYLOAD\":7}")));
+        var back = JsonSerializer.Deserialize(json, ctx.JsonPayloadUnionCaseSensitive);
+        back
+            .Should()
+            .NotBeNull();
+        back.TryGetPayload(out var p)
+            .Should()
+            .BeTrue();
+        p
+            .Should()
+            .Be(7);
     }
 
     [Fact]
-    public void Union_serialization_complex_roundtrip_with_arrays_and_nested_objects()
+    public void Union_serialization_STJ_complex_roundtrip()
     {
+        var ctx = ApiJsonComplexSerializationContext.Default;
         var payload = new ComplexPayload(
             Title: "t",
-            Numbers: new[] { 1, 2, 3 },
+            Numbers: [ 1, 2, 3 ],
             Items: new[] { new InnerItem(1, "a"), new InnerItem(2, "b") },
             Map: new Dictionary<string, InnerItem> { ["k"] = new InnerItem(9, "z") },
             Optional: null);
 
         var u = JsonComplexUnion.FromPayload(payload);
-        var bytes = u.ToUtf8Bytes();
-        var json = System.Text.Encoding.UTF8.GetString(bytes);
-        Assert.StartsWith("{\"payload\":", json);
+        var json = JsonSerializer.Serialize(u, ctx.JsonComplexUnion);
+        var normalizedJson = NormalizeJson(json);
 
-        var back = JsonComplexUnion.FromUtf8Bytes(bytes);
-        Assert.Equal(JsonComplexUnion.UnionTag.Payload, back.Tag);
-        Assert.True(back.TryGetPayload(out var backPayload));
+        var expectedJson = NormalizeJson("""
+        {
+          "payload": {
+            "title": "t",
+            "numbers": [1, 2, 3],
+            "items": [
+              {
+                "id": 1,
+                "name": "a"
+              },
+              {
+                "id": 2,
+                "name": "b"
+              }
+            ],
+            "map": {
+              "k": {
+                "id": 9,
+                "name": "z"
+              }
+            }
+          }
+        }
+        """);
 
-        Assert.Equal(payload.Title, backPayload.Title);
-        Assert.Equal(payload.Numbers, backPayload.Numbers);
-        Assert.Equal(payload.Items, backPayload.Items);
-        Assert.Equal(payload.Map["k"], backPayload.Map["k"]);
-        Assert.Null(backPayload.Optional);
+        normalizedJson
+            .Should()
+            .Be(expectedJson);
 
-        // case-insensitive key matching
-        var backUpper = JsonComplexUnion.FromUtf8Bytes(System.Text.Encoding.UTF8.GetBytes("{\"PAYLOAD\":" + json.Substring("{\"payload\":".Length)));
-        Assert.Equal(JsonComplexUnion.UnionTag.Payload, backUpper.Tag);
+        var back = JsonSerializer.Deserialize(json, ctx.JsonComplexUnion);
+        back
+            .Should()
+            .NotBeNull();
+        back.Tag
+            .Should()
+            .Be(JsonComplexUnion.UnionTag.Payload);
+        back.TryGetPayload(out var backPayload)
+            .Should()
+            .BeTrue();
+        backPayload
+            .Should()
+            .NotBeNull();
+
+        backPayload.Title
+            .Should()
+            .Be(payload.Title);
+        backPayload.Numbers
+            .Should()
+            .BeEquivalentTo(payload.Numbers);
+        backPayload.Items
+            .Should()
+            .BeEquivalentTo(payload.Items);
+        backPayload.Map["k"]
+            .Should()
+            .BeEquivalentTo(payload.Map["k"]);
+        backPayload.Optional
+            .Should()
+            .BeNull();
+    }
+
+    [Fact]
+    public void Union_serialization_STJ_nested_union_roundtrip()
+    {
+        var ctx = NestedUnionJsonSerializationContext.Default;
+
+        var deepUnion1 = DeepNestedUnion.FromDeepString("deep1");
+        var deepUnion2 = DeepNestedUnion.FromDeepInt(42);
+        var record = new RecordWithUnions("TestRecord", deepUnion1, deepUnion2);
+        var innerUnion = InnerNestedUnion.FromRecord(record);
+        var outerUnion = OuterNestedUnion.FromInner(innerUnion);
+
+        var json = JsonSerializer.Serialize(outerUnion, ctx.OuterNestedUnion);
+        var normalizedJson = NormalizeJson(json);
+
+        var expectedJson = NormalizeJson("""
+        {
+          "inner": {
+            "record": {
+              "name": "TestRecord",
+              "union1": {
+                "deepString": "deep1"
+              },
+              "union2": {
+                "deepInt": 42
+              }
+            }
+          }
+        }
+        """);
+
+        normalizedJson
+            .Should()
+            .Be(expectedJson);
+
+        var back = JsonSerializer.Deserialize(json, ctx.OuterNestedUnion);
+        back
+            .Should()
+            .NotBeNull();
+        back.Tag
+            .Should()
+            .Be(OuterNestedUnion.UnionTag.Inner);
+        back.TryGetInner(out var backInner)
+            .Should()
+            .BeTrue();
+        backInner
+            .Should()
+            .NotBeNull();
+
+        backInner.Tag
+            .Should()
+            .Be(InnerNestedUnion.UnionTag.Record);
+        backInner.TryGetRecord(out var backRecord)
+            .Should()
+            .BeTrue();
+        backRecord
+            .Should()
+            .NotBeNull();
+
+        backRecord.Name
+            .Should()
+            .Be("TestRecord");
+        backRecord.Union1
+            .Should()
+            .NotBeNull();
+        backRecord.Union1.Tag
+            .Should()
+            .Be(DeepNestedUnion.UnionTag.DeepString);
+        backRecord.Union1.TryGetDeepString(out var backDeepString)
+            .Should()
+            .BeTrue();
+        backDeepString
+            .Should()
+            .Be("deep1");
+
+        backRecord.Union2
+            .Should()
+            .NotBeNull();
+        backRecord.Union2.Tag
+            .Should()
+            .Be(DeepNestedUnion.UnionTag.DeepInt);
+        backRecord.Union2.TryGetDeepInt(out var backDeepInt)
+            .Should()
+            .BeTrue();
+        backDeepInt
+            .Should()
+            .Be(42);
     }
 }
 

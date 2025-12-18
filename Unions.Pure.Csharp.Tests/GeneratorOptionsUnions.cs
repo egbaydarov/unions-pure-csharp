@@ -1,20 +1,40 @@
-using Unions.Pure.Csharp;
+using System.Text.Json.Serialization;
 
 namespace Unions.Pure.Csharp.Tests;
 
-[UnionMember(typeof(string))]
-[UnionMember(typeof(int))]
-[UnionGenerator(GenerateTarget.TryOut)]
-public partial record struct TryOnlyUnion;
+[Union(GenerateTarget.TryOut)]
+public partial record TryOnlyUnion
+{
+    [JsonInclude]
+    [UnionMember]
+    internal string? String { get; init; }
 
-[UnionMember(typeof(string))]
-[UnionMember(typeof(int))]
-[UnionGenerator(GenerateTarget.Visitor)]
-public partial record struct VisitorOnlyUnion;
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
 
-[UnionMember(typeof(string))]
-[UnionMember(typeof(int))]
-[UnionGenerator(GenerateTarget.IndirectLambdas)]
-public partial record struct IndirectOnlyUnion;
+[Union(GenerateTarget.Visitor)]
+public partial record VisitorOnlyUnion
+{
+    [JsonInclude]
+    [UnionMember]
+    internal string? String { get; init; }
 
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
+
+[Union(GenerateTarget.IndirectLambdas)]
+public partial record IndirectOnlyUnion
+{
+    [JsonInclude]
+    [UnionMember]
+    internal string? String { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
 

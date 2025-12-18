@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Analyzer Include="..\Unions.Pure.Csharp.SourceGenerator\bin\Release\netstandard2.0\Unions.Pure.Csharp.SourceGenerator.dll" />
+    <ProjectReference Include="..\Unions.Pure.Csharp.SourceGenerator\Unions.Pure.Csharp.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
   </ItemGroup>
 </Project>
 

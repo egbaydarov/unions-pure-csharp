@@ -2,25 +2,49 @@ using System.Text.Json.Serialization;
 
 namespace Unions.Pure.Csharp.Tests;
 
-[UnionMember(typeof(string), "String1")]
-[UnionMember(typeof(string), "String2")]
-[UnionMember(typeof(int))]
-[UnionGenerator(GenerateTarget.TryOut)]
-[UnionSerializationContext(typeof(ApiJsonSerializationContext), caseInsensitivePropertyNameMatching: true)]
-public partial record class JsonTestUnion;
+[Union(GenerateTarget.TryOut)]
+public partial record class JsonTestUnion
+{
+    [JsonInclude]
+    [UnionMember("String1")]
+    internal string? String1 { get; init; }
 
-[UnionMember(typeof(string), "String1")]
-[UnionMember(typeof(string), "String2")]
-[UnionMember(typeof(int))]
-[UnionGenerator(GenerateTarget.TryOut)]
-[UnionSerializationContext(typeof(ApiJsonSerializationContext), caseInsensitivePropertyNameMatching: false)]
-public partial record class JsonTestUnionCaseSensitive;
+    [JsonInclude]
+    [UnionMember("String2")]
+    internal string? String2 { get; init; }
 
-[UnionMember(typeof(int), "Payload")]
-[UnionMember(typeof(string), "Message")]
-[UnionGenerator(GenerateTarget.TryOut)]
-[UnionSerializationContext(typeof(ApiJsonSerializationContext), caseInsensitivePropertyNameMatching: false)]
-public partial record class JsonPayloadUnionCaseSensitive;
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
+
+[Union(GenerateTarget.TryOut)]
+public partial record class JsonTestUnionCaseSensitive
+{
+    [JsonInclude]
+    [UnionMember("String1")]
+    internal string? String1 { get; init; }
+
+    [JsonInclude]
+    [UnionMember("String2")]
+    internal string? String2 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal int? Int32 { get; init; }
+}
+
+[Union(GenerateTarget.TryOut)]
+public partial record class JsonPayloadUnionCaseSensitive
+{
+    [JsonInclude]
+    [UnionMember("Payload")]
+    internal int? Payload { get; init; }
+
+    [JsonInclude]
+    [UnionMember("Message")]
+    internal string? Message { get; init; }
+}
 
 [JsonSourceGenerationOptions(
     UseStringEnumConverter = true,
@@ -28,7 +52,8 @@ public partial record class JsonPayloadUnionCaseSensitive;
     WriteIndented = false,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
     GenerationMode = JsonSourceGenerationMode.Default)]
-[JsonSerializable(typeof(string))]
-[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(JsonTestUnion))]
+[JsonSerializable(typeof(JsonTestUnionCaseSensitive))]
+[JsonSerializable(typeof(JsonPayloadUnionCaseSensitive))]
 public partial class ApiJsonSerializationContext : JsonSerializerContext;
 

@@ -37,16 +37,21 @@ namespace Unions.Pure.Csharp
         IndirectLambdas = 1,
         Visitor = 2,
         TryOut = 4,
-        // Json = 8, // legacy (replaced by [UnionSerializationContext])
-        All = IndirectLambdas | Visitor | TryOut
+        JsonSerialization = 8,
+        All = IndirectLambdas | Visitor | TryOut | JsonSerialization
     }
 
     [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public sealed class UnionGeneratorAttribute : Attribute
+    public sealed class UnionAttribute : Attribute
     {
         public GenerateTarget Targets { get; }
 
-        public UnionGeneratorAttribute(params GenerateTarget[] targets)
+        public UnionAttribute()
+        {
+            Targets = GenerateTarget.All;
+        }
+
+        public UnionAttribute(params GenerateTarget[] targets)
         {
             if (targets is null || targets.Length == 0)
             {
@@ -62,43 +67,22 @@ namespace Unions.Pure.Csharp
         }
     }
 
-    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
     public sealed class UnionMemberAttribute : Attribute
     {
-        public Type MemberType { get; }
         public string? Name { get; }
 
-        public UnionMemberAttribute(Type memberType)
+        public UnionMemberAttribute()
         {
-            MemberType = memberType;
             Name = null;
         }
 
-        public UnionMemberAttribute(Type memberType, string name)
+        public UnionMemberAttribute(string name)
         {
-            MemberType = memberType;
             Name = name;
         }
     }
 
-    [AttributeUsage(AttributeTargets.Struct | AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
-    public sealed class UnionSerializationContextAttribute : Attribute
-    {
-        public Type ContextType { get; }
-        public bool CaseInsensitivePropertyNameMatching { get; }
-
-        public UnionSerializationContextAttribute(Type contextType)
-        {
-            ContextType = contextType;
-            CaseInsensitivePropertyNameMatching = false;
-        }
-
-        public UnionSerializationContextAttribute(Type contextType, bool caseInsensitivePropertyNameMatching)
-        {
-            ContextType = contextType;
-            CaseInsensitivePropertyNameMatching = caseInsensitivePropertyNameMatching;
-        }
-    }
 }
 ";
 
@@ -150,9 +134,30 @@ namespace Unions.Pure.Csharp
             if (model.GetDeclaredSymbol(cand.TypeDecl) is not INamedTypeSymbol typeSymbol)
                 return;
 
-            var unionMemberAttrs = GetAttributesByShortName(cand.TypeDecl, "UnionMember");
-            if (unionMemberAttrs.Length == 0)
-                return; // not a union target
+            // Check if type is marked with [Union] attribute
+            var unionAttrs = GetAttributesByShortName(cand.TypeDecl, "Union");
+            if (unionAttrs.Length == 0)
+                return; // not a union target - must have [Union] attribute
+
+            // Extract members from properties only
+            var (members, memberNames, propertySymbols) = ExtractMembers(model, typeSymbol, Array.Empty<AttributeSyntax>(), cand.TypeDecl);
+            if (members.Length == 0)
+            {
+                spc.ReportDiagnostic(Diagnostic.Create(
+                    new DiagnosticDescriptor(
+                        id: "UNIONGEN006",
+                        title: "Union must have properties with [UnionMember]",
+                        messageFormat: "Type '{0}' has [Union] attribute but no properties with [UnionMember] attribute.",
+                        category: "Unions.Pure.Csharp",
+                        DiagnosticSeverity.Error,
+                        isEnabledByDefault: true),
+                    cand.TypeDecl.GetLocation(),
+                    typeSymbol.ToDisplayString()));
+                return;
+            }
+
+            // Validate that properties are at least internal for serialization
+            ValidatePropertyAccessibility(spc, propertySymbols);
 
             if (!cand.IsPartial)
             {
@@ -168,8 +173,6 @@ namespace Unions.Pure.Csharp
                     typeSymbol.ToDisplayString()));
                 return;
             }
-
-            var (members, memberNames) = ExtractMembers(model, unionMemberAttrs);
             if (members.Length < 2)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(
@@ -186,15 +189,11 @@ namespace Unions.Pure.Csharp
                 return;
             }
 
-            ValidateMemberNames(spc, typeSymbol, unionMemberAttrs, members, memberNames);
+            ValidateMemberNames(spc, typeSymbol, Array.Empty<AttributeSyntax>(), members, memberNames);
 
-            var unionGeneratorAttrs = GetAttributesByShortName(cand.TypeDecl, "UnionGenerator");
-            var targets = ExtractGenerateTargets(model, unionGeneratorAttrs);
+            var targets = ExtractGenerateTargets(model, unionAttrs);
 
-            var unionSerializationContextAttrs = GetAttributesByShortName(cand.TypeDecl, "UnionSerializationContext");
-            var serializationContextType = ExtractSerializationContext(model, unionSerializationContextAttrs);
-
-            var source = GenerateUnionSource(typeSymbol, members, memberNames, targets, serializationContextType?.ContextType, serializationContextType?.CaseInsensitivePropertyNameMatching ?? false);
+            var source = GenerateUnionSource(typeSymbol, members, memberNames, targets);
             var hintName = MakeHintName(typeSymbol);
             spc.AddSource(hintName, source);
         }
@@ -203,9 +202,7 @@ namespace Unions.Pure.Csharp
             INamedTypeSymbol typeSymbol,
             ITypeSymbol[] members,
             string?[] customNames,
-            GenerateTarget targets,
-            INamedTypeSymbol? serializationContextType,
-            bool caseInsensitivePropertyNameMatching)
+            GenerateTarget targets)
         {
             var ns = typeSymbol.ContainingNamespace.IsGlobalNamespace
                 ? null
@@ -246,13 +243,11 @@ namespace Unions.Pure.Csharp
             var sb = new StringBuilder(16_384);
             sb.AppendLine("// <auto-generated/>");
             sb.AppendLine("#nullable enable");
+            sb.AppendLine("#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.");
+            sb.AppendLine("#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.");
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Runtime.CompilerServices;");
-            if (serializationContextType is not null)
-            {
-                sb.AppendLine("using System.Buffers;");
-                sb.AppendLine("using System.Text.Json;");
-            }
+            sb.AppendLine("using System.Text.Json.Serialization;");
             sb.AppendLine();
 
             if (ns is not null)
@@ -276,43 +271,58 @@ namespace Unions.Pure.Csharp
             sb.AppendLine("    }");
             sb.AppendLine();
 
-            // Tag field
-            sb.AppendLine($"    public readonly {tagName} Tag;");
-
-            // Fields
+            // Tag property - computed from which property is non-null
+            sb.AppendLine("    public ").Append(tagName).Append(" Tag");
+            sb.AppendLine("    {");
+            sb.AppendLine("        get");
+            sb.AppendLine("        {");
             for (int i = 0; i < members.Length; i++)
             {
-                var t = members[i];
-                var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                var fieldName = MakeFieldIdentifier(tagIds[i]);
-
-                var needsNullable = t.IsReferenceType || IsNullableValueType(t);
-                sb.Append("    private readonly ").Append(typeName);
-                if (needsNullable) sb.Append('?');
-                sb.Append(' ').Append(fieldName).AppendLine(";");
+                var propName = tagIds[i];
+                var tagValue = tagName + "." + tagIds[i];
+                if (i == 0)
+                {
+                    sb.Append("            if (").Append(propName).Append(" != null) return ").Append(tagValue).AppendLine(";");
+                }
+                else
+                {
+                    sb.Append("            if (").Append(propName).Append(" != null) return ").Append(tagValue).AppendLine(";");
+                }
             }
+            sb.AppendLine("            return default;");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
             sb.AppendLine();
 
-            // ctor
+            // Properties with [JsonInclude] are already declared by the user
+            // We don't generate them - they're in the source code
+
+            // Parameterless constructor for STJ deserialization
+            sb.AppendLine("    public ").Append(typeSymbol.Name).AppendLine("()");
+            sb.AppendLine("    {");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+
+            // Parameterized constructor - public for manual construction
+            // Annotated with [JsonConstructor] so STJ uses it for deserialization
+            sb.AppendLine("    [JsonConstructor]");
             sb.AppendLine("    [MethodImpl(MethodImplOptions.AggressiveInlining)]");
-            sb.Append("    private ").Append(typeSymbol.Name).Append("(").Append(tagName).Append(" tag");
+            sb.Append("    public ").Append(typeSymbol.Name).Append("(");
             for (int i = 0; i < members.Length; i++)
             {
                 var t = members[i];
                 var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                var needsNullable = t.IsReferenceType || IsNullableValueType(t);
-                sb.Append(", ").Append(typeName);
-                if (needsNullable) sb.Append('?');
-                sb.Append(' ').Append(MakeParamIdentifier(tagIds[i]));
+                // Use type as-is from property (already nullable if needed)
+                if (i > 0) sb.Append(", ");
+                sb.Append(typeName).Append(' ').Append(MakeParamIdentifier(tagIds[i]));
             }
             sb.AppendLine(")");
             sb.AppendLine("    {");
-            sb.AppendLine("        Tag = tag;");
             for (int i = 0; i < members.Length; i++)
             {
-                var fieldName = MakeFieldIdentifier(tagIds[i]);
-                sb.Append("        ").Append(fieldName)
-                  .Append(" = ").Append(MakeParamIdentifier(tagIds[i])).AppendLine(";");
+                var propName = tagIds[i];
+                var paramName = MakeParamIdentifier(tagIds[i]);
+                sb.Append("        ").Append(propName).Append(" = ").Append(paramName).AppendLine(";");
             }
             sb.AppendLine("    }");
             sb.AppendLine();
@@ -323,17 +333,18 @@ namespace Unions.Pure.Csharp
                 var t = members[i];
                 var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 var tagIdent = tagIds[i];
+                var propName = tagIds[i];
                 var fromName = "From" + tagIdent;
 
                 sb.AppendLine("    [MethodImpl(MethodImplOptions.AggressiveInlining)]");
                 sb.Append("    public static ").Append(typeSymbol.Name).Append(' ').Append(fromName)
                   .Append('(').Append(typeName).AppendLine(" value)");
-                sb.Append("        => new(").Append(tagName).Append('.').Append(tagIdent);
-
+                sb.Append("        => new(");
                 for (int j = 0; j < members.Length; j++)
                 {
-                    if (j == i) sb.Append(", value");
-                    else sb.Append(", default");
+                    if (j > 0) sb.Append(", ");
+                    if (j == i) sb.Append("value");
+                    else sb.Append("default");
                 }
                 sb.AppendLine(");");
                 sb.AppendLine();
@@ -358,11 +369,11 @@ namespace Unions.Pure.Csharp
                 for (int i = 0; i < members.Length; i++)
                 {
                     var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
+                    var propName = tagIds[i];
                     var onName = "on" + tagIdent;
 
                     sb.Append("        if (Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(")");
-                    sb.Append("            return ").Append(onName).Append("(").Append(fieldName).AppendLine("!);");
+                    sb.Append("            return ").Append(onName).Append("(").Append(propName).AppendLine("!);");
                     sb.AppendLine();
                 }
 
@@ -379,7 +390,7 @@ namespace Unions.Pure.Csharp
                     var t = members[i];
                     var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                     var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
+                    var propName = tagIds[i];
 
                     sb.AppendLine("    [MethodImpl(MethodImplOptions.AggressiveInlining)]");
                     sb.Append("    public bool Is").Append(tagIdent).Append("() => Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(";");
@@ -391,7 +402,7 @@ namespace Unions.Pure.Csharp
                     sb.AppendLine("    {");
                     sb.Append("        if (Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(")");
                     sb.AppendLine("        {");
-                    sb.Append("            value = ").Append(fieldName).AppendLine("!;");
+                    sb.Append("            value = ").Append(propName).AppendLine("!;");
                     sb.AppendLine("            return true;");
                     sb.AppendLine("        }");
                     sb.AppendLine();
@@ -421,12 +432,12 @@ namespace Unions.Pure.Csharp
                 for (int i = 0; i < members.Length; i++)
                 {
                     var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
+                    var propName = tagIds[i];
                     var onName = "on" + tagIdent;
 
                     sb.Append("        if (Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(")");
                     sb.AppendLine("        {");
-                    sb.Append("            ").Append(onName).Append("(").Append(fieldName).AppendLine("!);");
+                    sb.Append("            ").Append(onName).Append("(").Append(propName).AppendLine("!);");
                     sb.AppendLine("            return;");
                     sb.AppendLine("        }");
                     sb.AppendLine();
@@ -471,11 +482,11 @@ namespace Unions.Pure.Csharp
                 for (int i = 0; i < members.Length; i++)
                 {
                     var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
+                    var propName = tagIds[i];
                     var methodName = "On" + tagIdent;
 
                     sb.Append("        if (Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(")");
-                    sb.Append("            return visitor.").Append(methodName).Append("(").Append(fieldName).AppendLine("!);");
+                    sb.Append("            return visitor.").Append(methodName).Append("(").Append(propName).AppendLine("!);");
                     sb.AppendLine();
                 }
                 sb.AppendLine("        return ThrowUnknownTag<TResult>(Tag);");
@@ -489,12 +500,12 @@ namespace Unions.Pure.Csharp
                 for (int i = 0; i < members.Length; i++)
                 {
                     var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
+                    var propName = tagIds[i];
                     var methodName = "On" + tagIdent;
 
                     sb.Append("        if (Tag == ").Append(tagName).Append('.').Append(tagIdent).AppendLine(")");
                     sb.AppendLine("        {");
-                    sb.Append("            visitor.").Append(methodName).Append("(").Append(fieldName).AppendLine("!);");
+                    sb.Append("            visitor.").Append(methodName).Append("(").Append(propName).AppendLine("!);");
                     sb.AppendLine("            return;");
                     sb.AppendLine("        }");
                     sb.AppendLine();
@@ -513,126 +524,11 @@ namespace Unions.Pure.Csharp
             sb.AppendLine($"    private static void ThrowUnknownTag({tagName} tag)");
             sb.AppendLine("        => throw new InvalidOperationException($\"Unknown tag: {tag}\");");
 
-            if (serializationContextType is not null && typeSymbol.TypeParameters.Length == 0)
-            {
-                var ctxFqn = serializationContextType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                var stringComparison = caseInsensitivePropertyNameMatching
-                    ? "global::System.StringComparison.OrdinalIgnoreCase"
-                    : "global::System.StringComparison.Ordinal";
-
-                sb.AppendLine();
-                sb.AppendLine("    private static string NameFor(global::System.Text.Json.JsonNamingPolicy? policy, string name)");
-                sb.AppendLine("        => policy is null ? name : policy.ConvertName(name);");
-
-                sb.AppendLine();
-                sb.AppendLine("    public byte[] ToUtf8Bytes()");
-                sb.AppendLine("    {");
-                sb.AppendLine("        var ctx = " + ctxFqn + ".Default;");
-                sb.AppendLine("        var policy = ctx.Options.PropertyNamingPolicy;");
-                sb.AppendLine("        var buffer = new global::System.Buffers.ArrayBufferWriter<byte>();");
-                sb.AppendLine("        using var writer = new global::System.Text.Json.Utf8JsonWriter(buffer);");
-                sb.AppendLine("        writer.WriteStartObject();");
-                sb.AppendLine("        switch (Tag)");
-                sb.AppendLine("        {");
-                for (int i = 0; i < members.Length; i++)
-                {
-                    var t = members[i];
-                    var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                    var tagIdent = tagIds[i];
-                    var fieldName = MakeFieldIdentifier(tagIds[i]);
-                    sb.AppendLine("            case " + tagName + "." + tagIdent + ":");
-                    sb.AppendLine("                writer.WritePropertyName(NameFor(policy, \"" + tagIdent + "\"));");
-                    sb.AppendLine("                global::System.Text.Json.JsonSerializer.Serialize<" + typeName + ">(writer, " + fieldName + "!, (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<" + typeName + ">)ctx.GetTypeInfo(typeof(" + typeName + "))!);");
-                    sb.AppendLine("                break;");
-                }
-                sb.AppendLine("            default: ThrowUnknownTag(Tag); break;");
-                sb.AppendLine("        }");
-                sb.AppendLine("        writer.WriteEndObject();");
-                sb.AppendLine("        writer.Flush();");
-                sb.AppendLine("        return buffer.WrittenSpan.ToArray();");
-                sb.AppendLine("    }");
-
-                sb.AppendLine();
-                sb.AppendLine("    public global::System.ReadOnlySpan<byte> ToUtf8Span()");
-                sb.AppendLine("        => ToUtf8Bytes();");
-
-                sb.AppendLine();
-                sb.AppendLine("    public global::System.ReadOnlyMemory<byte> ToUtf8Memory()");
-                sb.AppendLine("        => ToUtf8Bytes();");
-
-                sb.AppendLine();
-                sb.AppendLine("    public static " + typeSymbol.Name + " FromUtf8Bytes(byte[] utf8Json)");
-                sb.AppendLine("        => FromUtf8Bytes((global::System.ReadOnlySpan<byte>)utf8Json);");
-
-                sb.AppendLine();
-                sb.AppendLine("    public static " + typeSymbol.Name + " FromUtf8Bytes(global::System.ReadOnlySpan<byte> utf8Json)");
-                sb.AppendLine("    {");
-                sb.AppendLine("        var ctx = " + ctxFqn + ".Default;");
-                sb.AppendLine("        var policy = ctx.Options.PropertyNamingPolicy;");
-                sb.AppendLine("        var reader = new global::System.Text.Json.Utf8JsonReader(utf8Json, isFinalBlock: true, state: default);");
-                sb.AppendLine("        if (!reader.Read() || reader.TokenType != global::System.Text.Json.JsonTokenType.StartObject)");
-                sb.AppendLine("            throw new global::System.Text.Json.JsonException();");
-                sb.AppendLine("        if (!reader.Read() || reader.TokenType != global::System.Text.Json.JsonTokenType.PropertyName)");
-                sb.AppendLine("            throw new global::System.Text.Json.JsonException();");
-                sb.AppendLine("        var prop = reader.GetString() ?? throw new global::System.Text.Json.JsonException();");
-                sb.AppendLine("        if (!reader.Read()) throw new global::System.Text.Json.JsonException();");
-
-                for (int i = 0; i < members.Length; i++)
-                {
-                    var t = members[i];
-                    var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                    var tagIdent = tagIds[i];
-                    var fromName = "From" + tagIdent;
-                    sb.AppendLine("        {");
-                    sb.AppendLine("            var n1 = \"" + tagIdent + "\";");
-                    sb.AppendLine("            var n2 = NameFor(policy, \"" + tagIdent + "\");");
-                    sb.AppendLine("            if (string.Equals(prop, n1, " + stringComparison + ") || string.Equals(prop, n2, " + stringComparison + "))");
-                    sb.AppendLine("            {");
-                    sb.AppendLine("                var ti = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<" + typeName + ">)ctx.GetTypeInfo(typeof(" + typeName + "))!;");
-                    sb.AppendLine("                var v = global::System.Text.Json.JsonSerializer.Deserialize<" + typeName + ">(ref reader, ti);");
-                    sb.AppendLine("                if (!reader.Read() || reader.TokenType != global::System.Text.Json.JsonTokenType.EndObject)");
-                    sb.AppendLine("                    throw new global::System.Text.Json.JsonException();");
-                    sb.AppendLine("                return " + fromName + "(v!);");
-                    sb.AppendLine("            }");
-                    sb.AppendLine("        }");
-                }
-                sb.AppendLine("        // Consume value for unknown property, then throw.");
-                sb.AppendLine("        reader.Skip();");
-                sb.AppendLine("        throw new global::System.Text.Json.JsonException($\"Unknown union member: {prop}\");");
-                sb.AppendLine("    }");
-            }
-
             sb.AppendLine("}");
 
             return sb.ToString();
         }
 
-        private sealed record SerializationContextInfo(INamedTypeSymbol ContextType, bool CaseInsensitivePropertyNameMatching);
-
-        private static SerializationContextInfo? ExtractSerializationContext(SemanticModel model, AttributeSyntax[] attrs)
-        {
-            if (attrs.Length == 0)
-                return null;
-            if (attrs.Length > 1)
-                return null;
-
-            var attr = attrs[0];
-            var args = attr.ArgumentList?.Arguments;
-            if (args is null || args.Value.Count is < 1 or > 2)
-                return null;
-
-            if (!TryGetTypeOfArgument(model, args.Value[0].Expression, out var typeArg) || typeArg is not INamedTypeSymbol nts)
-                return null;
-
-            var caseInsensitive = false;
-            if (args.Value.Count == 2
-                && TryGetBoolArgument(model, args.Value[1].Expression, out var b))
-            {
-                caseInsensitive = b;
-            }
-
-            return new SerializationContextInfo(nts, caseInsensitive);
-        }
 
         private static string[] BuildTagIdentifiers(ITypeSymbol[] members, string?[] customNames)
         {
@@ -665,35 +561,83 @@ namespace Unions.Pure.Csharp
             return baseNames;
         }
 
-        private static (ITypeSymbol[] Members, string?[] Names) ExtractMembers(
+        private static (ITypeSymbol[] Members, string?[] Names, IPropertySymbol[] PropertySymbols) ExtractMembers(
             SemanticModel model,
-            AttributeSyntax[] unionMemberAttrs)
+            INamedTypeSymbol typeSymbol,
+            AttributeSyntax[] unionMemberAttrs,
+            TypeDeclarationSyntax typeDecl)
         {
-            var members = new List<ITypeSymbol>(unionMemberAttrs.Length);
-            var names = new List<string?>(unionMemberAttrs.Length);
+            // First, try to extract from properties
+            // Check all syntax references for partial types
+            var propertyMembers = new List<ITypeSymbol>();
+            var propertyNames = new List<string?>();
+            var propertySymbols = new List<IPropertySymbol>();
 
-            foreach (var attr in unionMemberAttrs)
+            // Get all property symbols from the type
+            foreach (var member in typeSymbol.GetMembers())
             {
-                // ctor: (Type memberType) or (Type memberType, string name)
-                var args = attr.ArgumentList?.Arguments;
-                if (args is null || args.Value.Count is < 1 or > 2)
-                    continue;
-
-                if (!TryGetTypeOfArgument(model, args.Value[0].Expression, out var ts) || ts is null)
-                    continue;
-
-                string? name = null;
-                if (args.Value.Count == 2
-                    && TryGetStringArgument(model, args.Value[1].Expression, out var s) && s is not null)
+                if (member is IPropertySymbol propSymbol)
                 {
-                    name = s;
-                }
+                    // Check all syntax references for this property (for partial types)
+                    foreach (var syntaxRef in propSymbol.DeclaringSyntaxReferences)
+                    {
+                        var propSyntax = syntaxRef.GetSyntax() as PropertyDeclarationSyntax;
+                        if (propSyntax != null)
+                        {
+                            var propAttrs = GetAttributesByShortName(propSyntax, "UnionMember");
+                            if (propAttrs.Length > 0)
+                            {
+                                var propType = propSymbol.Type;
+                                string? name = null;
 
-                members.Add(ts);
-                names.Add(name);
+                                // Extract name from attribute if provided
+                                foreach (var attr in propAttrs)
+                                {
+                                    var args = attr.ArgumentList?.Arguments;
+                                    if (args != null)
+                                    {
+                                        // Check for name parameter: [UnionMember(name: "X")] or [UnionMember("X")]
+                                        if (args.Value.Count == 1)
+                                        {
+                                            if (TryGetStringArgument(model, args.Value[0].Expression, out var s) && s is not null)
+                                            {
+                                                name = s;
+                                            }
+                                        }
+                                        else if (args.Value.Count == 2)
+                                        {
+                                            // Could be (Type, name) or (name, ...)
+                                            if (TryGetStringArgument(model, args.Value[0].Expression, out var s1) && s1 is not null)
+                                            {
+                                                name = s1;
+                                            }
+                                            else if (TryGetStringArgument(model, args.Value[1].Expression, out var s2) && s2 is not null)
+                                            {
+                                                name = s2;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // If no explicit name, use property name (sanitized)
+                                if (name == null)
+                                {
+                                    name = FirstUpper(SanitizeIdentifier(propSymbol.Name));
+                                }
+
+                                propertyMembers.Add(propType);
+                                propertyNames.Add(name);
+                                propertySymbols.Add(propSymbol);
+                                break; // Found this property, move to next
+                            }
+                        }
+                    }
+                }
             }
 
-            return (members.ToArray(), names.ToArray());
+            // If we found property-based members, use those
+            // Return property-based members
+            return (propertyMembers.ToArray(), propertyNames.ToArray(), propertySymbols.ToArray());
         }
 
         [Flags]
@@ -703,7 +647,8 @@ namespace Unions.Pure.Csharp
             IndirectLambdas = 1,
             Visitor = 2,
             TryOut = 4,
-            All = IndirectLambdas | Visitor | TryOut
+            JsonSerialization = 8,
+            All = IndirectLambdas | Visitor | TryOut | JsonSerialization
         }
 
         private static GenerateTarget ExtractGenerateTargets(SemanticModel model, AttributeSyntax[] attrs)
@@ -728,6 +673,31 @@ namespace Unions.Pure.Csharp
             }
 
             return acc == GenerateTarget.None ? GenerateTarget.All : acc;
+        }
+
+        private static void ValidatePropertyAccessibility(
+            SourceProductionContext spc,
+            IPropertySymbol[] propertySymbols)
+        {
+            foreach (var propSymbol in propertySymbols)
+            {
+                var accessibility = propSymbol.DeclaredAccessibility;
+                // Properties must be at least internal for serialization to work
+                if (accessibility != Accessibility.Public && accessibility != Accessibility.Internal)
+                {
+                    var location = propSymbol.Locations.FirstOrDefault();
+                    spc.ReportDiagnostic(Diagnostic.Create(
+                        new DiagnosticDescriptor(
+                            id: "UNIONGEN008",
+                            title: "UnionMember property must be at least internal",
+                            messageFormat: "Property '{0}' marked with [UnionMember] must be at least internal (public or internal) for serialization to work.",
+                            category: "Unions.Pure.Csharp",
+                            DiagnosticSeverity.Error,
+                            isEnabledByDefault: true),
+                        location ?? Location.None,
+                        propSymbol.Name));
+                }
+            }
         }
 
         private static void ValidateMemberNames(
@@ -811,6 +781,29 @@ namespace Unions.Pure.Csharp
             var result = new List<AttributeSyntax>();
 
             foreach (var list in typeDecl.AttributeLists)
+            {
+                foreach (var attr in list.Attributes)
+                {
+                    var rightmost = GetRightmostIdentifier(attr.Name);
+                    if (rightmost is null)
+                        continue;
+
+                    if (string.Equals(rightmost, shortNameWithoutAttributeSuffix, StringComparison.Ordinal) ||
+                        string.Equals(rightmost, shortNameWithoutAttributeSuffix + "Attribute", StringComparison.Ordinal))
+                    {
+                        result.Add(attr);
+                    }
+                }
+            }
+
+            return result.ToArray();
+        }
+
+        private static AttributeSyntax[] GetAttributesByShortName(PropertyDeclarationSyntax propDecl, string shortNameWithoutAttributeSuffix)
+        {
+            var result = new List<AttributeSyntax>();
+
+            foreach (var list in propDecl.AttributeLists)
             {
                 foreach (var attr in list.Attributes)
                 {
@@ -944,6 +937,9 @@ namespace Unions.Pure.Csharp
                 case nameof(GenerateTarget.TryOut):
                     target = GenerateTarget.TryOut;
                     return true;
+                case "JsonSerialization":
+                    target = (GenerateTarget)8; // JsonSerialization = 8
+                    return true;
                 case nameof(GenerateTarget.All):
                     target = GenerateTarget.All;
                     return true;
@@ -1038,4 +1034,5 @@ namespace Unions.Pure.Csharp
         private readonly record struct Candidate(TypeDeclarationSyntax TypeDecl, bool IsPartial);
     }
 }
+
 

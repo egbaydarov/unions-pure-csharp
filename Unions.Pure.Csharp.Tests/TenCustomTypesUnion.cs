@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Unions.Pure.Csharp;
 
 namespace Unions.Pure.Csharp.Tests;
@@ -13,16 +14,46 @@ public sealed record C7;
 public sealed record C8;
 public sealed record C9;
 
-[UnionMember(typeof(C0))]
-[UnionMember(typeof(C1))]
-[UnionMember(typeof(C2))]
-[UnionMember(typeof(C3))]
-[UnionMember(typeof(C4))]
-[UnionMember(typeof(C5))]
-[UnionMember(typeof(C6))]
-[UnionMember(typeof(C7))]
-[UnionMember(typeof(C8))]
-[UnionMember(typeof(C9))]
-public partial record struct TenCustomTypesUnion;
+[Union]
+public partial record TenCustomTypesUnion
+{
+    [JsonInclude]
+    [UnionMember]
+    internal C0? C0 { get; init; }
 
+    [JsonInclude]
+    [UnionMember]
+    internal C1? C1 { get; init; }
 
+    [JsonInclude]
+    [UnionMember]
+    internal C2? C2 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C3? C3 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C4? C4 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C5? C5 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C6? C6 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C7? C7 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C8? C8 { get; init; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal C9? C9 { get; init; }
+}

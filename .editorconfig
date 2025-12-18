@@ -1,3 +1,36 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.sh]
+shell_variant      = posix
+binary_next_line   = true
+switch_case_indent = true
+space_redirects    = true
+keep_padding       = true
+
+[*.json]
+indent_size = 2
+
+# YAML Files
+[*.{yml,yaml}]
+indent_size = 2
+
+# Markdown Files
+[*.md]
+trim_trailing_whitespace = false
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab
 [*.cs]
 
 # IDE0290: Use primary constructor
