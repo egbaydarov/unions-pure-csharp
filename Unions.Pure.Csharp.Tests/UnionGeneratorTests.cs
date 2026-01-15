@@ -544,5 +544,22 @@ public class UnionGeneratorTests
             .Should()
             .Be(42);
     }
+
+    // TODO: possible solution custom deserializer
+    [Fact(Skip = "Need workaround to fail on deserialization not on accessing union members for invalid json")]
+    public void Union_FailsOnWrongUnion()
+    {
+        var ctx = ApiJsonSerializationContext.Default;
+        var actualBrokenJson = NormalizeJson("""
+        {
+          "string_wrong_key": "hello"
+        }
+        """);
+
+        var back = JsonSerializer.Deserialize(actualBrokenJson, ctx.JsonTestUnionCaseSensitive);
+        back
+            .Should()
+            .BeNull();
+    }
 }
 

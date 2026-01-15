@@ -51,6 +51,5 @@ public partial record class OuterNestedUnion
 [JsonSerializable(typeof(OuterNestedUnion))]
 [JsonSerializable(typeof(InnerNestedUnion))]
 [JsonSerializable(typeof(DeepNestedUnion))]
-[JsonSerializable(typeof(RecordWithUnions))]
 public partial class NestedUnionJsonSerializationContext : JsonSerializerContext;
 

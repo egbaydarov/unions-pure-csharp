@@ -140,7 +140,7 @@ namespace Unions.Pure.Csharp
                 return; // not a union target - must have [Union] attribute
 
             // Extract members from properties only
-            var (members, memberNames, propertySymbols) = ExtractMembers(model, typeSymbol, Array.Empty<AttributeSyntax>(), cand.TypeDecl);
+            var (members, memberNames, propertySymbols) = ExtractMembers(model, typeSymbol);
             if (members.Length == 0)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(
@@ -333,7 +333,6 @@ namespace Unions.Pure.Csharp
                 var t = members[i];
                 var typeName = t.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 var tagIdent = tagIds[i];
-                var propName = tagIds[i];
                 var fromName = "From" + tagIdent;
 
                 sb.AppendLine("    [MethodImpl(MethodImplOptions.AggressiveInlining)]");
@@ -515,6 +514,7 @@ namespace Unions.Pure.Csharp
                 sb.AppendLine();
             }
 
+            // TODO: probably non-static method works faster
             // Throw helpers out-of-line
             sb.AppendLine("    [MethodImpl(MethodImplOptions.NoInlining)]");
             sb.AppendLine($"    private static T ThrowUnknownTag<T>({tagName} tag)");
@@ -563,9 +563,7 @@ namespace Unions.Pure.Csharp
 
         private static (ITypeSymbol[] Members, string?[] Names, IPropertySymbol[] PropertySymbols) ExtractMembers(
             SemanticModel model,
-            INamedTypeSymbol typeSymbol,
-            AttributeSyntax[] unionMemberAttrs,
-            TypeDeclarationSyntax typeDecl)
+            INamedTypeSymbol typeSymbol)
         {
             // First, try to extract from properties
             // Check all syntax references for partial types
@@ -581,8 +579,7 @@ namespace Unions.Pure.Csharp
                     // Check all syntax references for this property (for partial types)
                     foreach (var syntaxRef in propSymbol.DeclaringSyntaxReferences)
                     {
-                        var propSyntax = syntaxRef.GetSyntax() as PropertyDeclarationSyntax;
-                        if (propSyntax != null)
+                        if (syntaxRef.GetSyntax() is PropertyDeclarationSyntax propSyntax)
                         {
                             var propAttrs = GetAttributesByShortName(propSyntax, "UnionMember");
                             if (propAttrs.Length > 0)
@@ -620,10 +617,7 @@ namespace Unions.Pure.Csharp
                                 }
 
                                 // If no explicit name, use property name (sanitized)
-                                if (name == null)
-                                {
-                                    name = FirstUpper(SanitizeIdentifier(propSymbol.Name));
-                                }
+                                name ??= FirstUpper(SanitizeIdentifier(propSymbol.Name));
 
                                 propertyMembers.Add(propType);
                                 propertyNames.Add(name);
@@ -834,19 +828,6 @@ namespace Unions.Pure.Csharp
             };
         }
 
-        private static bool TryGetTypeOfArgument(SemanticModel model, ExpressionSyntax expr, out ITypeSymbol? type)
-        {
-            expr = Unwrap(expr);
-            if (expr is TypeOfExpressionSyntax toe)
-            {
-                type = model.GetTypeInfo(toe.Type).Type;
-                return type is not null;
-            }
-
-            type = null;
-            return false;
-        }
-
         private static bool TryGetStringArgument(SemanticModel model, ExpressionSyntax expr, out string? value)
         {
             expr = Unwrap(expr);
@@ -857,19 +838,6 @@ namespace Unions.Pure.Csharp
             }
 
             value = null;
-            return false;
-        }
-
-        private static bool TryGetBoolArgument(SemanticModel model, ExpressionSyntax expr, out bool value)
-        {
-            expr = Unwrap(expr);
-            if (model.GetConstantValue(expr) is { HasValue: true, Value: bool b })
-            {
-                value = b;
-                return true;
-            }
-
-            value = default;
             return false;
         }
 
@@ -937,8 +905,8 @@ namespace Unions.Pure.Csharp
                 case nameof(GenerateTarget.TryOut):
                     target = GenerateTarget.TryOut;
                     return true;
-                case "JsonSerialization":
-                    target = (GenerateTarget)8; // JsonSerialization = 8
+                case nameof(GenerateTarget.JsonSerialization):
+                    target = GenerateTarget.JsonSerialization;
                     return true;
                 case nameof(GenerateTarget.All):
                     target = GenerateTarget.All;
@@ -948,10 +916,6 @@ namespace Unions.Pure.Csharp
                     return false;
             }
         }
-
-        private static bool IsNullableValueType(ITypeSymbol t)
-            => t is INamedTypeSymbol nts
-               && nts.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
 
         private static string MakeTagIdentifier(ITypeSymbol t, int index)
         {
@@ -970,9 +934,6 @@ namespace Unions.Pure.Csharp
 
             return FirstUpper(baseName);
         }
-
-        private static string MakeFieldIdentifier(string tagIdent)
-            => EscapeIdentifier("_" + FirstLower(tagIdent));
 
         private static string MakeParamIdentifier(string tagIdent)
             => EscapeIdentifier(FirstLower(tagIdent));
