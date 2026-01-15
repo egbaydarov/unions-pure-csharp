@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.3"></a>
+## [2.0.3](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.2...v2.0.3) (2026-01-15)
+
+### Not Important
+
+* clean up ([218bbb0](https://github.com/egbaydarov/unions-pure-csharp/commit/218bbb0c2607f21e75ecf73143ac024efb867012))
+
 <a name="2.0.2"></a>
 ## [2.0.2](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.1...v2.0.2) (2025-12-18)
 
