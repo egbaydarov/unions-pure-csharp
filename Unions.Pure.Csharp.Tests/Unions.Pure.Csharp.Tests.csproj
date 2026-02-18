@@ -6,6 +6,8 @@
     <IsPackable>false</IsPackable>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+    <!-- Enable Swagger schema generation in this project (tests need it; app projects that use Swagger should set this too) -->
+    <DefineConstants>$(DefineConstants);UNIONS_SWAGGER_SCHEMAS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

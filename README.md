@@ -166,17 +166,33 @@ The `Tag` property is automatically computed from which property is non-null, so
 
 ## Swagger / OpenAPI (e.g. AOT apps)
 
-In AOT or trimming scenarios, Swashbuckle may fail to generate schemas for union types via reflection. When your project references **Swashbuckle.AspNetCore**, the generator emits a helper that registers correct OpenAPI schemas for all union types in the assembly.
+The generator emits Swagger/OpenAPI schema registration whenever the project has union types, but that code is **conditionally compiled** so you don't have to reference Swashbuckle in every project that has unions.
 
-1. Reference Swashbuckle as usual: `dotnet add package Swashbuckle.AspNetCore`
-2. In your Swagger setup, call the generated extension inside `AddSwaggerGen`:
+- **Libraries / contracts (unions only):** Do nothing. The Swagger code is wrapped in `#if UNIONS_SWAGGER_SCHEMAS` and is not compiled, so no Swashbuckle reference is required.
+- **App project (the one that uses Swagger):** Define `UNIONS_SWAGGER_SCHEMAS`, reference Swashbuckle, and call the generated registration.
+
+1. In the **app** project only, add the define and Swashbuckle:
+
+   ```xml
+   <PropertyGroup>
+     <DefineConstants>$(DefineConstants);UNIONS_SWAGGER_SCHEMAS</DefineConstants>
+   </PropertyGroup>
+   <ItemGroup>
+     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+   </ItemGroup>
+   ```
+
+2. In your Swagger setup, call the generated static method. The generated class name is **unique per assembly** (`PureUnionsSwaggerGen_<AssemblyName>`). Call it for the app assembly and for any referenced assembly that has unions and was built with `UNIONS_SWAGGER_SCHEMAS` (if you need those in Swagger too):
 
 ```csharp
 using Unions.Pure.Csharp;
 
 builder.Services.AddSwaggerGen(configure =>
 {
-    configure.AddPureUnionsSwaggerGen();  // maps all [Union] types in this assembly
+    PureUnionsSwaggerGen_MyApi.AddUnionSchemaMappings(configure);
+    // If your contracts library was built with UNIONS_SWAGGER_SCHEMAS and refs Swashbuckle:
+    // PureUnionsSwaggerGen_MyContracts.AddUnionSchemaMappings(configure);
+
     configure.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
 });
 ```

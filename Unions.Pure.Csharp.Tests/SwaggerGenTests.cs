@@ -17,13 +17,16 @@ public sealed class SwaggerGenTests
 
         files
             .Should()
-            .NotBeEmpty("PureUnionsSwaggerGen.g.cs should be emitted when the project references Swashbuckle");
+            .NotBeEmpty("PureUnionsSwaggerGen.g.cs should be emitted whenever the project has union types");
 
         var content = File.ReadAllText(files[0]);
 
         content
             .Should()
-            .Contain("AddPureUnionsSwaggerGen", "extension method should be generated");
+            .Contain("AddUnionSchemaMappings", "static method should be generated");
+        content
+            .Should()
+            .Contain("PureUnionsSwaggerGen_", "class name should be unique per assembly");
         content
             .Should()
             .Contain("MapType<", "union types should be mapped");
@@ -51,10 +54,10 @@ public sealed class SwaggerGenTests
     }
 
     [Fact]
-    public void AddPureUnionsSwaggerGen_registers_union_schemas_and_JsonTestUnion_schema_has_correct_shape()
+    public void AddUnionSchemaMappings_registers_union_schemas_and_JsonTestUnion_schema_has_correct_shape()
     {
         var options = new SwaggerGenOptions();
-        options.AddPureUnionsSwaggerGen();
+        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
 
         var schemaGeneratorOptions = options.SchemaGeneratorOptions;
         schemaGeneratorOptions
@@ -121,10 +124,10 @@ public sealed class SwaggerGenTests
     }
 
     [Fact]
-    public void AddPureUnionsSwaggerGen_registers_all_union_types_from_assembly()
+    public void AddUnionSchemaMappings_registers_all_union_types_from_assembly()
     {
         var options = new SwaggerGenOptions();
-        options.AddPureUnionsSwaggerGen();
+        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
 
         var customMappings = options.SchemaGeneratorOptions.CustomTypeMappings;
 
@@ -146,7 +149,7 @@ public sealed class SwaggerGenTests
     public void JsonPayloadUnionCaseSensitive_schema_has_payload_and_message_properties()
     {
         var options = new SwaggerGenOptions();
-        options.AddPureUnionsSwaggerGen();
+        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
 
         var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(JsonPayloadUnionCaseSensitive)]!();
 
