@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.5"></a>
+## [2.0.5](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.4...v2.0.5) (2026-02-18)
+
+### Not Important
+
+* conditonally compile ([ac6d737](https://github.com/egbaydarov/unions-pure-csharp/commit/ac6d737e595514fe91a89c76a101644f17f3e0d8))
+
 <a name="2.0.4"></a>
 ## [2.0.4](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.3...v2.0.4) (2026-02-18)
 
