@@ -163,3 +163,22 @@ var back = JsonSerializer.Deserialize(json, ctx.SomeUnion);
 ```
 
 The `Tag` property is automatically computed from which property is non-null, so it doesn't need to be serialized.
+
+## Swagger / OpenAPI (e.g. AOT apps)
+
+In AOT or trimming scenarios, Swashbuckle may fail to generate schemas for union types via reflection. When your project references **Swashbuckle.AspNetCore**, the generator emits a helper that registers correct OpenAPI schemas for all union types in the assembly.
+
+1. Reference Swashbuckle as usual: `dotnet add package Swashbuckle.AspNetCore`
+2. In your Swagger setup, call the generated extension inside `AddSwaggerGen`:
+
+```csharp
+using Unions.Pure.Csharp;
+
+builder.Services.AddSwaggerGen(configure =>
+{
+    configure.AddPureUnionsSwaggerGen();  // maps all [Union] types in this assembly
+    configure.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+});
+```
+
+Each union is mapped to an `object` schema with optional properties matching the union members (and their types), so the docs show the real shape instead of an empty stub.
