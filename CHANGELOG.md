@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.4"></a>
+## [2.0.4](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.3...v2.0.4) (2026-02-18)
+
+### Not Important
+
+* tiny update for swagger ([4b22b87](https://github.com/egbaydarov/unions-pure-csharp/commit/4b22b87d9405b79f2c3f6e3d1a6b5ad8952c7b2c))
+
 <a name="2.0.3"></a>
 ## [2.0.3](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.2...v2.0.3) (2026-01-15)
 
