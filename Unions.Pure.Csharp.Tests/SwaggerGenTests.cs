@@ -1,5 +1,5 @@
 using AwesomeAssertions;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Unions.Pure.Csharp;
 using Xunit;
@@ -26,6 +26,9 @@ public sealed class SwaggerGenTests
             .Contain("AddUnionSchemaMappings", "static method should be generated");
         content
             .Should()
+            .Contain("AddPureUnionsSwaggerGen", "extension method should be generated");
+        content
+            .Should()
             .Contain("PureUnionsSwaggerGen_", "class name should be unique per assembly");
         content
             .Should()
@@ -35,7 +38,10 @@ public sealed class SwaggerGenTests
             .Contain("global::Unions.Pure.Csharp.Tests.JsonTestUnion", "JsonTestUnion should be registered");
         content
             .Should()
-            .Contain("Type = \"object\"", "union schema should be object");
+            .Contain("Type = JsonSchemaType.Object", "union schema should be object");
+        content
+            .Should()
+            .Contain("Dictionary<string, IOpenApiSchema>", "Properties dictionary must use the IOpenApiSchema interface");
         content
             .Should()
             .Contain("\"string1\"", "JsonTestUnion should have string1 property");
@@ -47,10 +53,30 @@ public sealed class SwaggerGenTests
             .Contain("\"int32\"", "JsonTestUnion should have int32 property");
         content
             .Should()
-            .Contain("Type = \"integer\", Format = \"int32\", Nullable = true", "int32 member should be nullable integer");
+            .Contain("Type = JsonSchemaType.Integer | JsonSchemaType.Null, Format = \"int32\"", "int32 member should be a nullable integer");
         content
             .Should()
             .Contain("using Microsoft.Extensions.DependencyInjection;", "MapType extension requires this namespace");
+        content
+            .Should()
+            .Contain("using Microsoft.OpenApi;", "OpenApi v2 lives in Microsoft.OpenApi (not Microsoft.OpenApi.Models)");
+        content
+            .Should()
+            .NotContain("Microsoft.OpenApi.Models", "OpenApi v2 removed the .Models namespace");
+        content
+            .Should()
+            .NotContain("Nullable = true", "OpenApi v2 expresses null via JsonSchemaType.Null flag, not Nullable property");
+        content
+            .Should()
+            .NotContain("OpenApiReference", "OpenApi v2 uses OpenApiSchemaReference instead of the old OpenApiReference");
+    }
+
+    [Fact]
+    public void AddPureUnionsSwaggerGen_extension_method_registers_schemas()
+    {
+        var options = new SwaggerGenOptions();
+        options.AddPureUnionsSwaggerGen();
+        options.SchemaGeneratorOptions.CustomTypeMappings.Should().ContainKey(typeof(JsonTestUnion));
     }
 
     [Fact]
@@ -80,7 +106,7 @@ public sealed class SwaggerGenTests
             .NotBeNull();
         schema!.Type
             .Should()
-            .Be("object");
+            .Be(JsonSchemaType.Object);
         schema.Properties
             .Should()
             .NotBeNull();
@@ -94,29 +120,20 @@ public sealed class SwaggerGenTests
             .Should()
             .ContainKey("int32");
 
-        schema.Properties["string1"].Type
+        schema.Properties!["string1"].Type
             .Should()
-            .Be("string");
-        schema.Properties["string1"].Nullable
-            .Should()
-            .BeTrue();
+            .Be(JsonSchemaType.String | JsonSchemaType.Null);
 
         schema.Properties["string2"].Type
             .Should()
-            .Be("string");
-        schema.Properties["string2"].Nullable
-            .Should()
-            .BeTrue();
+            .Be(JsonSchemaType.String | JsonSchemaType.Null);
 
         schema.Properties["int32"].Type
             .Should()
-            .Be("integer");
+            .Be(JsonSchemaType.Integer | JsonSchemaType.Null);
         schema.Properties["int32"].Format
             .Should()
             .Be("int32");
-        schema.Properties["int32"].Nullable
-            .Should()
-            .BeTrue();
 
         schema.Description
             .Should()
@@ -153,11 +170,11 @@ public sealed class SwaggerGenTests
 
         var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(JsonPayloadUnionCaseSensitive)]!();
 
-        schema.Type.Should().Be("object");
+        schema.Type.Should().Be(JsonSchemaType.Object);
         schema.Properties.Should().ContainKey("payload");
         schema.Properties.Should().ContainKey("message");
-        schema.Properties["payload"].Type.Should().Be("integer");
+        schema.Properties!["payload"].Type.Should().Be(JsonSchemaType.Integer | JsonSchemaType.Null);
         schema.Properties["payload"].Format.Should().Be("int32");
-        schema.Properties["message"].Type.Should().Be("string");
+        schema.Properties["message"].Type.Should().Be(JsonSchemaType.String | JsonSchemaType.Null);
     }
 }
