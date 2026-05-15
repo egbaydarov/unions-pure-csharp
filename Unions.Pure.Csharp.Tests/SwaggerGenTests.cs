@@ -34,7 +34,10 @@ public sealed class SwaggerGenTests
         content.Should().Contain("Type = JsonSchemaType.Object", "union schema is an object");
         content.Should().Contain("Dictionary<string, IOpenApiSchema>", "Properties dictionary must use the IOpenApiSchema interface");
 
-        content.Should().Contain("using Microsoft.Extensions.DependencyInjection;", "MapType / SchemaFilter extensions live here");
+        content.Should().Contain("EnsureUniqueSchemaIdsForNestedTypes",
+            "nested types in different declaring types must not share the default short schema id");
+        content.Should().Contain("ConditionalWeakTable<SwaggerGenOptions, object>",
+            "schema id patch must run at most once per SwaggerGenOptions instance");
         content.Should().Contain("using Microsoft.OpenApi;", "OpenApi v2 lives in Microsoft.OpenApi");
         content.Should().NotContain("Microsoft.OpenApi.Models", "OpenApi v2 removed the .Models namespace");
         content.Should().NotContain("Nullable = true", "OpenApi v2 expresses null via JsonSchemaType.Null, not Nullable");
@@ -68,6 +71,30 @@ public sealed class SwaggerGenTests
             .Count(d => d.Type.Name.StartsWith("PureUnionsSchemaFilter_"))
             .Should()
             .Be(1, "the schema filter must only be registered once");
+    }
+
+    [Fact]
+    public void Unions_with_nested_members_having_the_same_short_type_name_do_not_collide()
+    {
+        using var generator = BuildSchemaGenerator();
+        var repo = new SchemaRepository();
+
+        var act = () =>
+        {
+            _ = generator.Generator.GenerateSchema(typeof(NestCollisionUnionA), repo);
+            _ = generator.Generator.GenerateSchema(typeof(NestCollisionUnionB), repo);
+        };
+
+        act.Should().NotThrow(
+            "default type.Name ids are ambiguous for nested types; AddPureUnionsSwaggerGen must wrap SchemaIdSelector");
+
+        repo.Schemas.Keys
+            .Should()
+            .ContainSingle(k => k.Contains("NestCollisionUnionA", StringComparison.Ordinal) && k.Contains("SharedNestedName", StringComparison.Ordinal));
+
+        repo.Schemas.Keys
+            .Should()
+            .ContainSingle(k => k.Contains("NestCollisionUnionB", StringComparison.Ordinal) && k.Contains("SharedNestedName", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -73,3 +73,37 @@ public sealed partial class NestedRecordsTestUnion
     public sealed record BetaNestedCase(int Count, bool Enabled);
 }
 
+/// <summary>
+/// Two unions with nested member types that share the same short C# name; Swashbuckle's
+/// default schema id (<c>type.Name</c>) collides unless nested types use a disambiguated id.
+/// </summary>
+[Union]
+public sealed partial class NestCollisionUnionA
+{
+    [JsonInclude]
+    [UnionMember]
+    internal SharedNestedName? Branch { get; set; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal AltBranch? Other { get; set; }
+
+    public sealed record SharedNestedName(int A);
+    public sealed record AltBranch();
+}
+
+[Union]
+public sealed partial class NestCollisionUnionB
+{
+    [JsonInclude]
+    [UnionMember]
+    internal SharedNestedName? Branch { get; set; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal AltBranch? Other { get; set; }
+
+    public sealed record SharedNestedName(string B);
+    public sealed record AltBranch();
+}
+
