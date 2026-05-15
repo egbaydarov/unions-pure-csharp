@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.10"></a>
+## [2.0.10](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.9...v2.0.10) (2026-05-15)
+
+### Not Important
+
+* fix nested types (swagger) ([3a5b5ce](https://github.com/egbaydarov/unions-pure-csharp/commit/3a5b5ce909613a5919429811d6c097bc2275f145))
+
 <a name="2.0.9"></a>
 ## [2.0.9](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.8...v2.0.9) (2026-05-15)
 
