@@ -1119,8 +1119,8 @@ namespace Unions.Pure.Csharp
             {
                 var fullTypeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 var methodName = MakeSwaggerSchemaMethodName(typeSymbol);
-                sb.Append("            options.MapType<").Append(fullTypeName).Append(">(() => ")
-                    .Append(methodName).AppendLine("());");
+                sb.Append("            TryMapType<").Append(fullTypeName).Append(">(options, () => ")
+                    .Append(methodName).AppendLine("(options));");
             }
 
             sb.AppendLine("        }");
@@ -1129,11 +1129,22 @@ namespace Unions.Pure.Csharp
             sb.AppendLine("        public static void AddPureUnionsSwaggerGen(this SwaggerGenOptions options)");
             sb.AppendLine("            => AddUnionSchemaMappings(options);");
             sb.AppendLine();
+            sb.AppendLine("        /// <summary>");
+            sb.AppendLine("        /// Idempotent variant of <see cref=\"SwaggerGenOptionsExtensions.MapType{T}(SwaggerGenOptions, System.Func{IOpenApiSchema})\"/>.");
+            sb.AppendLine("        /// Leaves the existing mapping in place if the type was already registered, so callers can override individual union schemas before invoking AddPureUnionsSwaggerGen.");
+            sb.AppendLine("        /// </summary>");
+            sb.AppendLine("        private static void TryMapType<T>(SwaggerGenOptions options, System.Func<IOpenApiSchema> schemaFactory)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var mappings = options.SchemaGeneratorOptions.CustomTypeMappings;");
+            sb.AppendLine("            if (mappings.ContainsKey(typeof(T))) return;");
+            sb.AppendLine("            mappings.Add(typeof(T), schemaFactory);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
 
             foreach (var (typeSymbol, members, tagIds) in unionTypes)
             {
                 var methodName = MakeSwaggerSchemaMethodName(typeSymbol);
-                sb.Append("        private static OpenApiSchema ").Append(methodName).AppendLine("()");
+                sb.Append("        private static OpenApiSchema ").Append(methodName).AppendLine("(SwaggerGenOptions options)");
                 sb.AppendLine("            => new OpenApiSchema");
                 sb.AppendLine("            {");
                 sb.AppendLine("                Type = JsonSchemaType.Object,");
@@ -1256,9 +1267,13 @@ namespace Unions.Pure.Csharp
 
         private static string ReferenceSchemaCSharp(ITypeSymbol typeSymbol)
         {
-            var fullName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            var refId = fullName.Replace("global::", string.Empty);
-            return "new OpenApiSchemaReference(\"" + refId + "\")";
+            // Resolve the schema id at runtime via Swashbuckle's configured SchemaIdSelector
+            // (default: type.Name). This is the only way to produce a $ref id that matches
+            // whatever Swashbuckle will actually register the referenced type under -
+            // especially important for nested types where the default schema id is just the
+            // unqualified type name, not the dotted/plus-qualified path.
+            var fullyQualified = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            return "new OpenApiSchemaReference(options.SchemaGeneratorOptions.SchemaIdSelector(typeof(" + fullyQualified + ")))";
         }
 
         private readonly record struct Candidate(TypeDeclarationSyntax TypeDecl, bool IsPartial);

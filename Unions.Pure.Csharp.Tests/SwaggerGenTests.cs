@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Unions.Pure.Csharp;
@@ -32,7 +33,7 @@ public sealed class SwaggerGenTests
             .Contain("PureUnionsSwaggerGen_", "class name should be unique per assembly");
         content
             .Should()
-            .Contain("MapType<", "union types should be mapped");
+            .Contain("TryMapType<", "union types should be mapped via the idempotent helper so duplicate registrations don't crash");
         content
             .Should()
             .Contain("global::Unions.Pure.Csharp.Tests.JsonTestUnion", "JsonTestUnion should be registered");
@@ -160,6 +161,66 @@ public sealed class SwaggerGenTests
         customMappings
             .Should()
             .ContainKey(typeof(SampleUnion));
+    }
+
+    [Fact]
+    public void Nested_record_union_members_are_referenced_by_the_configured_schema_id()
+    {
+        var options = new SwaggerGenOptions();
+        options.AddPureUnionsSwaggerGen();
+
+        var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(BrandPerformanceIncludeParameters)]!();
+
+        schema.Type.Should().Be(JsonSchemaType.Object);
+        schema.Properties.Should().ContainKeys("onlyHyperplay", "onlyBuyFeature", "allBets");
+
+        // Default SchemaIdSelector is type => type.Name, so nested records should be referenced
+        // by their unqualified name - not "BrandPerformanceIncludeParameters.IncludeOnlyHyperplay".
+        schema.Properties!["onlyHyperplay"].Should().BeOfType<OpenApiSchemaReference>();
+        ((OpenApiSchemaReference)schema.Properties["onlyHyperplay"]).Reference.Id
+            .Should().Be("IncludeOnlyHyperplay");
+
+        ((OpenApiSchemaReference)schema.Properties["onlyBuyFeature"]).Reference.Id
+            .Should().Be("IncludeOnlyBuyFeature");
+
+        ((OpenApiSchemaReference)schema.Properties["allBets"]).Reference.Id
+            .Should().Be("IncludeAllBets");
+    }
+
+    [Fact]
+    public void Schema_references_honor_a_custom_SchemaIdSelector_set_before_factory_invocation()
+    {
+        var options = new SwaggerGenOptions();
+        options.AddPureUnionsSwaggerGen();
+        options.SchemaGeneratorOptions.SchemaIdSelector = t => $"Custom_{t.Name}";
+
+        var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(BrandPerformanceIncludeParameters)]!();
+
+        ((OpenApiSchemaReference)schema.Properties!["onlyHyperplay"]).Reference.Id
+            .Should().Be("Custom_IncludeOnlyHyperplay", "factory must defer to the live SchemaIdSelector");
+    }
+
+    [Fact]
+    public void AddPureUnionsSwaggerGen_is_idempotent_when_called_twice()
+    {
+        var options = new SwaggerGenOptions();
+        options.AddPureUnionsSwaggerGen();
+        var act = () => options.AddPureUnionsSwaggerGen();
+        act.Should().NotThrow("calling AddPureUnionsSwaggerGen multiple times must not double-register types");
+    }
+
+    [Fact]
+    public void AddPureUnionsSwaggerGen_does_not_overwrite_a_preexisting_mapping()
+    {
+        var options = new SwaggerGenOptions();
+        Func<IOpenApiSchema> userFactory = () => new OpenApiSchema { Type = JsonSchemaType.Object, Description = "user override" };
+        options.MapType<JsonTestUnion>(userFactory);
+
+        options.AddPureUnionsSwaggerGen();
+
+        options.SchemaGeneratorOptions.CustomTypeMappings[typeof(JsonTestUnion)]
+            .Should()
+            .BeSameAs(userFactory, "pre-registered mappings must win so callers can override individual union schemas");
     }
 
     [Fact]

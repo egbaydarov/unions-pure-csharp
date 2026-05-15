@@ -53,3 +53,27 @@ public partial record class OuterNestedUnion
 [JsonSerializable(typeof(DeepNestedUnion))]
 public partial class NestedUnionJsonSerializationContext : JsonSerializerContext;
 
+[Union]
+public sealed partial class BrandPerformanceIncludeParameters
+{
+    [JsonInclude]
+    [UnionMember]
+    internal IncludeOnlyHyperplay? OnlyHyperplay { get; set; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal IncludeOnlyBuyFeature? OnlyBuyFeature { get; set; }
+
+    [JsonInclude]
+    [UnionMember]
+    internal IncludeAllBets? AllBets { get; set; }
+
+    public sealed record IncludeOnlyHyperplay();
+    public sealed record IncludeOnlyBuyFeature();
+    public sealed record IncludeAllBets(
+        bool IncludeFreeSpins,
+        bool IncludeJackpots,
+        bool IncludeBonusSystem,
+        bool IncludeHyperplay);
+}
+
