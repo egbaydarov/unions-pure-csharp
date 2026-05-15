@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.6"></a>
+## [2.0.6](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.5...v2.0.6) (2026-05-15)
+
+### Not Important
+
+* support swagger ([b0d600a](https://github.com/egbaydarov/unions-pure-csharp/commit/b0d600aedfac72bb0acc8dc072cd744564d2c105))
+
 <a name="2.0.5"></a>
 ## [2.0.5](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.4...v2.0.5) (2026-02-18)
 
