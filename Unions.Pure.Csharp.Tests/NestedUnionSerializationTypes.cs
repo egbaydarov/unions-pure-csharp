@@ -53,27 +53,23 @@ public partial record class OuterNestedUnion
 [JsonSerializable(typeof(DeepNestedUnion))]
 public partial class NestedUnionJsonSerializationContext : JsonSerializerContext;
 
+/// <summary>
+/// Verifies that union members whose types are records nested inside the union's
+/// own declaring type are correctly registered into Swashbuckle's schema repository
+/// and referenced from the parent union's schema by the same id.
+/// </summary>
 [Union]
-public sealed partial class BrandPerformanceIncludeParameters
+public sealed partial class NestedRecordsTestUnion
 {
     [JsonInclude]
     [UnionMember]
-    internal IncludeOnlyHyperplay? OnlyHyperplay { get; set; }
+    internal AlphaNestedCase? Alpha { get; set; }
 
     [JsonInclude]
     [UnionMember]
-    internal IncludeOnlyBuyFeature? OnlyBuyFeature { get; set; }
+    internal BetaNestedCase? Beta { get; set; }
 
-    [JsonInclude]
-    [UnionMember]
-    internal IncludeAllBets? AllBets { get; set; }
-
-    public sealed record IncludeOnlyHyperplay();
-    public sealed record IncludeOnlyBuyFeature();
-    public sealed record IncludeAllBets(
-        bool IncludeFreeSpins,
-        bool IncludeJackpots,
-        bool IncludeBonusSystem,
-        bool IncludeHyperplay);
+    public sealed record AlphaNestedCase(string Label);
+    public sealed record BetaNestedCase(int Count, bool Enabled);
 }
 

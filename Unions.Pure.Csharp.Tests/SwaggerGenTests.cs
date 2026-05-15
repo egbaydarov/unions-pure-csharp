@@ -1,5 +1,6 @@
 using AwesomeAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Unions.Pure.Csharp;
@@ -22,182 +23,36 @@ public sealed class SwaggerGenTests
 
         var content = File.ReadAllText(files[0]);
 
-        content
-            .Should()
-            .Contain("AddUnionSchemaMappings", "static method should be generated");
-        content
-            .Should()
-            .Contain("AddPureUnionsSwaggerGen", "extension method should be generated");
-        content
-            .Should()
-            .Contain("PureUnionsSwaggerGen_", "class name should be unique per assembly");
-        content
-            .Should()
-            .Contain("TryMapType<", "union types should be mapped via the idempotent helper so duplicate registrations don't crash");
-        content
-            .Should()
-            .Contain("global::Unions.Pure.Csharp.Tests.JsonTestUnion", "JsonTestUnion should be registered");
-        content
-            .Should()
-            .Contain("Type = JsonSchemaType.Object", "union schema should be object");
-        content
-            .Should()
-            .Contain("Dictionary<string, IOpenApiSchema>", "Properties dictionary must use the IOpenApiSchema interface");
-        content
-            .Should()
-            .Contain("\"string1\"", "JsonTestUnion should have string1 property");
-        content
-            .Should()
-            .Contain("\"string2\"", "JsonTestUnion should have string2 property");
-        content
-            .Should()
-            .Contain("\"int32\"", "JsonTestUnion should have int32 property");
-        content
-            .Should()
-            .Contain("Type = JsonSchemaType.Integer | JsonSchemaType.Null, Format = \"int32\"", "int32 member should be a nullable integer");
-        content
-            .Should()
-            .Contain("using Microsoft.Extensions.DependencyInjection;", "MapType extension requires this namespace");
-        content
-            .Should()
-            .Contain("using Microsoft.OpenApi;", "OpenApi v2 lives in Microsoft.OpenApi (not Microsoft.OpenApi.Models)");
-        content
-            .Should()
-            .NotContain("Microsoft.OpenApi.Models", "OpenApi v2 removed the .Models namespace");
-        content
-            .Should()
-            .NotContain("Nullable = true", "OpenApi v2 expresses null via JsonSchemaType.Null flag, not Nullable property");
-        content
-            .Should()
-            .NotContain("OpenApiReference", "OpenApi v2 uses OpenApiSchemaReference instead of the old OpenApiReference");
+        content.Should().Contain("AddUnionSchemaMappings", "static registration helper should be generated");
+        content.Should().Contain("AddPureUnionsSwaggerGen", "extension method should be generated");
+        content.Should().Contain("PureUnionsSwaggerGen_", "class name should be unique per assembly");
+        content.Should().Contain("PureUnionsSchemaFilter_", "an ISchemaFilter class should be generated per assembly");
+        content.Should().Contain(": ISchemaFilter", "the filter class must implement ISchemaFilter so it joins Swashbuckle's pipeline");
+        content.Should().Contain("options.SchemaFilter<", "the entry-point should register the filter via SchemaFilter<T>()");
+        content.Should().Contain("context.SchemaGenerator.GenerateSchema(",
+            "every union member must go through SchemaGenerator so dependent types are registered in /components/schemas");
+        content.Should().Contain("Type = JsonSchemaType.Object", "union schema is an object");
+        content.Should().Contain("Dictionary<string, IOpenApiSchema>", "Properties dictionary must use the IOpenApiSchema interface");
+
+        content.Should().Contain("using Microsoft.Extensions.DependencyInjection;", "MapType / SchemaFilter extensions live here");
+        content.Should().Contain("using Microsoft.OpenApi;", "OpenApi v2 lives in Microsoft.OpenApi");
+        content.Should().NotContain("Microsoft.OpenApi.Models", "OpenApi v2 removed the .Models namespace");
+        content.Should().NotContain("Nullable = true", "OpenApi v2 expresses null via JsonSchemaType.Null, not Nullable");
+        content.Should().NotContain("OpenApiReference", "OpenApi v2 uses OpenApiSchemaReference, and the generator no longer emits raw $refs");
+        content.Should().NotContain("CustomTypeMappings",
+            "the generator must not use MapType / CustomTypeMappings - that path bypasses Swashbuckle's schema generator and leaves member $refs dangling");
     }
 
     [Fact]
-    public void AddPureUnionsSwaggerGen_extension_method_registers_schemas()
-    {
-        var options = new SwaggerGenOptions();
-        options.AddPureUnionsSwaggerGen();
-        options.SchemaGeneratorOptions.CustomTypeMappings.Should().ContainKey(typeof(JsonTestUnion));
-    }
-
-    [Fact]
-    public void AddUnionSchemaMappings_registers_union_schemas_and_JsonTestUnion_schema_has_correct_shape()
-    {
-        var options = new SwaggerGenOptions();
-        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
-
-        var schemaGeneratorOptions = options.SchemaGeneratorOptions;
-        schemaGeneratorOptions
-            .Should()
-            .NotBeNull();
-
-        var customMappings = schemaGeneratorOptions!.CustomTypeMappings;
-        customMappings
-            .Should()
-            .ContainKey(typeof(JsonTestUnion));
-
-        var schemaFactory = customMappings[typeof(JsonTestUnion)];
-        schemaFactory
-            .Should()
-            .NotBeNull();
-
-        var schema = schemaFactory!();
-        schema
-            .Should()
-            .NotBeNull();
-        schema!.Type
-            .Should()
-            .Be(JsonSchemaType.Object);
-        schema.Properties
-            .Should()
-            .NotBeNull();
-        schema.Properties
-            .Should()
-            .ContainKey("string1");
-        schema.Properties
-            .Should()
-            .ContainKey("string2");
-        schema.Properties
-            .Should()
-            .ContainKey("int32");
-
-        schema.Properties!["string1"].Type
-            .Should()
-            .Be(JsonSchemaType.String | JsonSchemaType.Null);
-
-        schema.Properties["string2"].Type
-            .Should()
-            .Be(JsonSchemaType.String | JsonSchemaType.Null);
-
-        schema.Properties["int32"].Type
-            .Should()
-            .Be(JsonSchemaType.Integer | JsonSchemaType.Null);
-        schema.Properties["int32"].Format
-            .Should()
-            .Be("int32");
-
-        schema.Description
-            .Should()
-            .Contain("Union");
-    }
-
-    [Fact]
-    public void AddUnionSchemaMappings_registers_all_union_types_from_assembly()
-    {
-        var options = new SwaggerGenOptions();
-        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
-
-        var customMappings = options.SchemaGeneratorOptions.CustomTypeMappings;
-
-        customMappings
-            .Should()
-            .ContainKey(typeof(JsonTestUnion));
-        customMappings
-            .Should()
-            .ContainKey(typeof(JsonTestUnionCaseSensitive));
-        customMappings
-            .Should()
-            .ContainKey(typeof(JsonPayloadUnionCaseSensitive));
-        customMappings
-            .Should()
-            .ContainKey(typeof(SampleUnion));
-    }
-
-    [Fact]
-    public void Nested_record_union_members_are_referenced_by_the_configured_schema_id()
+    public void AddPureUnionsSwaggerGen_registers_the_assembly_schema_filter()
     {
         var options = new SwaggerGenOptions();
         options.AddPureUnionsSwaggerGen();
 
-        var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(BrandPerformanceIncludeParameters)]!();
-
-        schema.Type.Should().Be(JsonSchemaType.Object);
-        schema.Properties.Should().ContainKeys("onlyHyperplay", "onlyBuyFeature", "allBets");
-
-        // Default SchemaIdSelector is type => type.Name, so nested records should be referenced
-        // by their unqualified name - not "BrandPerformanceIncludeParameters.IncludeOnlyHyperplay".
-        schema.Properties!["onlyHyperplay"].Should().BeOfType<OpenApiSchemaReference>();
-        ((OpenApiSchemaReference)schema.Properties["onlyHyperplay"]).Reference.Id
-            .Should().Be("IncludeOnlyHyperplay");
-
-        ((OpenApiSchemaReference)schema.Properties["onlyBuyFeature"]).Reference.Id
-            .Should().Be("IncludeOnlyBuyFeature");
-
-        ((OpenApiSchemaReference)schema.Properties["allBets"]).Reference.Id
-            .Should().Be("IncludeAllBets");
-    }
-
-    [Fact]
-    public void Schema_references_honor_a_custom_SchemaIdSelector_set_before_factory_invocation()
-    {
-        var options = new SwaggerGenOptions();
-        options.AddPureUnionsSwaggerGen();
-        options.SchemaGeneratorOptions.SchemaIdSelector = t => $"Custom_{t.Name}";
-
-        var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(BrandPerformanceIncludeParameters)]!();
-
-        ((OpenApiSchemaReference)schema.Properties!["onlyHyperplay"]).Reference.Id
-            .Should().Be("Custom_IncludeOnlyHyperplay", "factory must defer to the live SchemaIdSelector");
+        options.SchemaFilterDescriptors
+            .Should()
+            .Contain(d => d.Type.Name.StartsWith("PureUnionsSchemaFilter_"),
+                "AddPureUnionsSwaggerGen should hook the generator's ISchemaFilter into Swashbuckle");
     }
 
     [Fact]
@@ -205,37 +60,134 @@ public sealed class SwaggerGenTests
     {
         var options = new SwaggerGenOptions();
         options.AddPureUnionsSwaggerGen();
+
         var act = () => options.AddPureUnionsSwaggerGen();
-        act.Should().NotThrow("calling AddPureUnionsSwaggerGen multiple times must not double-register types");
-    }
+        act.Should().NotThrow("calling AddPureUnionsSwaggerGen multiple times must be a no-op");
 
-    [Fact]
-    public void AddPureUnionsSwaggerGen_does_not_overwrite_a_preexisting_mapping()
-    {
-        var options = new SwaggerGenOptions();
-        Func<IOpenApiSchema> userFactory = () => new OpenApiSchema { Type = JsonSchemaType.Object, Description = "user override" };
-        options.MapType<JsonTestUnion>(userFactory);
-
-        options.AddPureUnionsSwaggerGen();
-
-        options.SchemaGeneratorOptions.CustomTypeMappings[typeof(JsonTestUnion)]
+        options.SchemaFilterDescriptors
+            .Count(d => d.Type.Name.StartsWith("PureUnionsSchemaFilter_"))
             .Should()
-            .BeSameAs(userFactory, "pre-registered mappings must win so callers can override individual union schemas");
+            .Be(1, "the schema filter must only be registered once");
     }
 
     [Fact]
-    public void JsonPayloadUnionCaseSensitive_schema_has_payload_and_message_properties()
+    public void Union_with_primitive_members_produces_an_object_schema_with_one_property_per_member()
     {
-        var options = new SwaggerGenOptions();
-        PureUnionsSwaggerGen_Unions_Pure_Csharp_Tests.AddUnionSchemaMappings(options);
+        using var generator = BuildSchemaGenerator();
+        var repo = new SchemaRepository();
 
-        var schema = options.SchemaGeneratorOptions.CustomTypeMappings[typeof(JsonPayloadUnionCaseSensitive)]!();
+        var schema = generator.Generator.GenerateSchema(typeof(JsonTestUnion), repo);
+        var resolved = ResolveSchema(schema, repo);
 
-        schema.Type.Should().Be(JsonSchemaType.Object);
-        schema.Properties.Should().ContainKey("payload");
-        schema.Properties.Should().ContainKey("message");
-        schema.Properties!["payload"].Type.Should().Be(JsonSchemaType.Integer | JsonSchemaType.Null);
-        schema.Properties["payload"].Format.Should().Be("int32");
-        schema.Properties["message"].Type.Should().Be(JsonSchemaType.String | JsonSchemaType.Null);
+        resolved.Type.Should().Be(JsonSchemaType.Object);
+        resolved.Description.Should().Contain("Union");
+        resolved.Properties.Should().NotBeNull();
+        resolved.Properties.Should().ContainKey("string1");
+        resolved.Properties.Should().ContainKey("string2");
+        resolved.Properties.Should().ContainKey("int32");
+        resolved.Properties!["int32"].Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Union_member_types_are_registered_in_the_schema_repository_with_proper_refs()
+    {
+        using var generator = BuildSchemaGenerator();
+        var repo = new SchemaRepository();
+
+        var schema = generator.Generator.GenerateSchema(typeof(OuterNestedUnion), repo);
+        var resolved = ResolveSchema(schema, repo);
+
+        resolved.Properties.Should().ContainKey("inner");
+        resolved.Properties!["inner"].Should().BeOfType<OpenApiSchemaReference>(
+            "complex union members must be emitted as $refs, not inlined");
+
+        // The referenced union schema must itself be registered in the schema repository
+        // (so the resulting OpenAPI document's /components/schemas actually contains it).
+        repo.Schemas.Should().ContainKey(nameof(InnerNestedUnion));
+    }
+
+    [Fact]
+    public void Nested_record_union_members_register_their_schema_and_resolve_via_ref()
+    {
+        // This is the regression test for the original "dangling $ref" issue: types declared
+        // *inside* a union's own declaration must end up in /components/schemas, otherwise the
+        // generated OpenAPI document fails validation.
+        using var generator = BuildSchemaGenerator();
+        var repo = new SchemaRepository();
+
+        var schema = generator.Generator.GenerateSchema(typeof(NestedRecordsTestUnion), repo);
+        var resolved = ResolveSchema(schema, repo);
+
+        resolved.Type.Should().Be(JsonSchemaType.Object);
+        resolved.Properties.Should().ContainKeys("alpha", "beta");
+
+        foreach (var memberKey in new[] { "alpha", "beta" })
+        {
+            var memberSchema = resolved.Properties![memberKey];
+            memberSchema.Should().BeOfType<OpenApiSchemaReference>($"member '{memberKey}' must be a $ref");
+
+            var refId = ((OpenApiSchemaReference)memberSchema).Reference.Id;
+            refId.Should().NotBeNullOrWhiteSpace();
+            repo.Schemas
+                .Should()
+                .ContainKey(refId!, $"the schema referenced by '{memberKey}' (id='{refId}') must be registered in /components/schemas");
+        }
+    }
+
+    [Fact]
+    public void All_union_types_in_the_assembly_route_through_the_schema_filter()
+    {
+        using var generator = BuildSchemaGenerator();
+        var repo = new SchemaRepository();
+
+        foreach (var unionType in new[]
+        {
+            typeof(JsonTestUnion),
+            typeof(JsonTestUnionCaseSensitive),
+            typeof(JsonPayloadUnionCaseSensitive),
+            typeof(SampleUnion),
+            typeof(NestedRecordsTestUnion),
+        })
+        {
+            var schema = generator.Generator.GenerateSchema(unionType, repo);
+            var resolved = ResolveSchema(schema, repo);
+
+            resolved.Type
+                .Should()
+                .Be(JsonSchemaType.Object, $"union '{unionType.Name}' must end up as an object schema");
+            resolved.Description
+                .Should()
+                .Contain("Union", $"union '{unionType.Name}' must carry the generated union description");
+            resolved.Properties
+                .Should()
+                .NotBeNullOrEmpty($"union '{unionType.Name}' must have at least one member property");
+        }
+    }
+
+    private sealed class GeneratorHolder(ServiceProvider provider) : IDisposable
+    {
+        public ISchemaGenerator Generator { get; } = provider.GetRequiredService<ISchemaGenerator>();
+        public void Dispose() => provider.Dispose();
+    }
+
+    private static GeneratorHolder BuildSchemaGenerator()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<Microsoft.Extensions.Logging.ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddSwaggerGen(options => options.AddPureUnionsSwaggerGen());
+        return new GeneratorHolder(services.BuildServiceProvider());
+    }
+
+    /// <summary>
+    /// Returns the underlying <see cref="OpenApiSchema"/>, dereferencing once if Swashbuckle returned a $ref.
+    /// </summary>
+    private static OpenApiSchema ResolveSchema(IOpenApiSchema schema, SchemaRepository repo)
+    {
+        return schema switch
+        {
+            OpenApiSchemaReference r => (OpenApiSchema)repo.Schemas[r.Reference.Id!],
+            OpenApiSchema s => s,
+            _ => throw new InvalidOperationException($"Unexpected schema type {schema.GetType()}"),
+        };
     }
 }
