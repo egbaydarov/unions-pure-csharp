@@ -426,7 +426,10 @@ namespace Unions.Pure.Csharp
             sb.AppendLine("        EnsureUniqueSchemaIdsForNestedTypes(options);");
             sb.Append("        var filterType = typeof(").Append(filterName).AppendLine(");");
             sb.AppendLine("        if (options.SchemaFilterDescriptors.Any(d => d.Type == filterType)) return;");
-            sb.Append("        options.SchemaFilter<").Append(filterName).AppendLine(">();");
+            sb.AppendLine("        // Register a pre-constructed instance instead of options.SchemaFilter<T>(): the latter");
+            sb.AppendLine("        // makes Swashbuckle build the filter via ActivatorUtilities reflection, whose constructor");
+            sb.AppendLine("        // gets trimmed under Native AOT (\"A suitable constructor ... could not be located\").");
+            sb.Append("        options.AddSchemaFilterInstance(new ").Append(filterName).AppendLine("());");
             sb.AppendLine("    }");
             sb.AppendLine();
             sb.AppendLine("    /// <summary>");
