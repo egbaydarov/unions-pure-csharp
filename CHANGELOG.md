@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.12"></a>
+## [2.0.12](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.11...v2.0.12) (2026-06-18)
+
+### Not Important
+
+* add dummy constructor ([ab4ffea](https://github.com/egbaydarov/unions-pure-csharp/commit/ab4ffea1eca5e49ac60175b8ca701148037adf97))
+
 <a name="2.0.11"></a>
 ## [2.0.11](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.10...v2.0.11) (2026-06-18)
 
