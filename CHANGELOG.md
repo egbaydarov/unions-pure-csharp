@@ -1,4 +1,11 @@
 ## Changelog
+<a name="2.0.11"></a>
+## [2.0.11](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.10...v2.0.11) (2026-06-18)
+
+### Not Important
+
+* make swaggergen independant (and more explicit) ([456cf2e](https://github.com/egbaydarov/unions-pure-csharp/commit/456cf2e77e745550698e75dd6c148dd66451b87b))
+
 <a name="2.0.10"></a>
 ## [2.0.10](https://github.com/egbaydarov/unions-pure-csharp/compare/v2.0.9...v2.0.10) (2026-05-15)
 
