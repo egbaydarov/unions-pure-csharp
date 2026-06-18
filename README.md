@@ -166,30 +166,34 @@ The `Tag` property is automatically computed from which property is non-null, so
 
 ## Swagger / OpenAPI (e.g. AOT apps)
 
-The generator emits Swagger/OpenAPI schema registration when the project has union types **and** references **Swashbuckle.AspNetCore**. No extra define is needed: add the package and the code is generated and compiled.
+Union types live in contract libraries; Swagger wiring belongs in the project that references **Swashbuckle**.
 
-- **Libraries (unions only, no Swagger):** Don't reference Swashbuckle. No Swagger code is emitted, so no extra dependency.
-- **App project (uses Swagger):** Reference Swashbuckle and call the generated registration.
+1. **Contracts (unions only):** declare `[Union]` types. Do **not** reference Swashbuckle and do **not** add `[SwaggerUnionSchema]` — no Swagger code is emitted there.
 
-1. Add Swashbuckle in the project that uses Swagger:
+2. **App / API project (uses Swagger):** reference Swashbuckle and declare a partial host class:
 
-   ```xml
-   <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+   ```csharp
+   using Unions.Pure.Csharp;
+
+   [SwaggerUnionSchema]
+   public partial class SwaggerUnionGen;
    ```
 
-2. In your Swagger setup, call the generated extension:
+3. In `AddSwaggerGen`, call the generated registration on that host:
 
-```csharp
-using Unions.Pure.Csharp;
+   ```csharp
+   builder.Services.AddSwaggerGen(configure =>
+   {
+       SwaggerUnionGen.AddUnionSchemaMappings(configure);
 
-builder.Services.AddSwaggerGen(configure =>
-{
-    configure.AddPureUnionsSwaggerGen();  // this assembly's union schemas
-    // For union types in a referenced assembly that also references Swashbuckle:
-    // PureUnionsSwaggerGen_MyContracts.AddUnionSchemaMappings(configure);
+       configure.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+   });
+   ```
 
-    configure.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
-});
-```
+How it works (and why):
 
-Each union is mapped to an `object` schema with optional properties matching the union members (and their types), so the docs show the real shape instead of an empty stub.
+- Each assembly that declares `[Union]` types emits a small, **public, Swashbuckle-free** descriptor class `Unions.Pure.Csharp.PureUnionsRegistry_<AssemblyName>` that exposes each union type and its member names/types. This lives in the contracts library but has no Swagger dependency.
+- The descriptor is required because union members are declared `internal`, and internal members of a referenced assembly are invisible to the Swagger host (the compiler imports only public/protected metadata). The public registry carries the member shapes across the assembly boundary.
+- The Swagger host project (the one with `[SwaggerUnionSchema]` + Swashbuckle) discovers every `PureUnionsRegistry_*` in its whole reference graph and generates a single `ISchemaFilter` plus the partial `SwaggerUnionGen.AddUnionSchemaMappings` entry point.
+
+Each union is mapped to an `object` schema whose properties are generated through Swashbuckle's own pipeline (so complex member types are registered in `components/schemas` as proper `$ref`s), and nested types with colliding short names get unique schema ids automatically.

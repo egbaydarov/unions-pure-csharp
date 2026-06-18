@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -83,6 +84,16 @@ namespace Unions.Pure.Csharp
         }
     }
 
+    /// <summary>
+    /// Place on a partial class in the project that references Swashbuckle. The generator emits
+    /// <c>AddUnionSchemaMappings</c> on that class, wiring up union schemas from this project
+    /// and any referenced assemblies that contain <see cref=""UnionAttribute""/> types.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
+    public sealed class SwaggerUnionSchemaAttribute : Attribute
+    {
+    }
+
 }
 ";
 
@@ -91,7 +102,8 @@ namespace Unions.Pure.Csharp
             // Don’t re-emit our helper types if they already come from a referenced assembly.
             initContext.RegisterSourceOutput(initContext.CompilationProvider, static (spc, compilation) =>
             {
-                if (compilation.GetTypeByMetadataName(AttributeFullName) is null)
+                if (compilation.GetTypeByMetadataName(AttributeFullName) is null
+                    || compilation.GetTypeByMetadataName("Unions.Pure.Csharp.SwaggerUnionSchemaAttribute") is null)
                     spc.AddSource("UnionMemberAttribute.g.cs", InjectedAttributeSource);
             });
 
@@ -124,8 +136,9 @@ namespace Unions.Pure.Csharp
                 }
             });
 
-            // Emit Swagger/OpenAPI schema mappings when the project has union types AND references Swashbuckle.
-            // No manual define needed: adding Swashbuckle.AspNetCore is enough for the code to be emitted and compiled.
+            // Emit Swagger/OpenAPI wiring only in projects that declare [SwaggerUnionSchema] and reference Swashbuckle.
+            // Per-assembly schema filters are generated here (not in contracts libraries), scanning unions from the
+            // whole reference graph so transitive contract assemblies are included.
             initContext.RegisterSourceOutput(compilationAndTargets, static (spc, pair) =>
             {
                 var (compilation, candidates) = pair;
@@ -136,8 +149,92 @@ namespace Unions.Pure.Csharp
                 if (compilation.GetTypeByMetadataName("Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions") is null)
                     return;
 
-                var unionTypes = new List<(INamedTypeSymbol TypeSymbol, ITypeSymbol[] Members, string[] TagIds)>();
+                var swaggerHosts = new List<SwaggerHostCandidate>();
+                foreach (var cand in candidates)
+                {
+                    if (GetAttributesByShortName(cand.TypeDecl, "SwaggerUnionSchema").Length == 0)
+                        continue;
 
+                    var model = compilation.GetSemanticModel(cand.TypeDecl.SyntaxTree);
+                    if (model.GetDeclaredSymbol(cand.TypeDecl) is not INamedTypeSymbol hostSymbol)
+                        continue;
+
+                    if (cand.TypeDecl is not ClassDeclarationSyntax)
+                    {
+                        spc.ReportDiagnostic(Diagnostic.Create(
+                            new DiagnosticDescriptor(
+                                id: "UNIONGEN009",
+                                title: "SwaggerUnionSchema target must be a class",
+                                messageFormat: "Type '{0}' has [SwaggerUnionSchema] but is not a class.",
+                                category: "Unions.Pure.Csharp",
+                                DiagnosticSeverity.Error,
+                                isEnabledByDefault: true),
+                            cand.TypeDecl.GetLocation(),
+                            hostSymbol.ToDisplayString()));
+                        continue;
+                    }
+
+                    if (!cand.IsPartial)
+                    {
+                        spc.ReportDiagnostic(Diagnostic.Create(
+                            new DiagnosticDescriptor(
+                                id: "UNIONGEN010",
+                                title: "SwaggerUnionSchema target must be partial",
+                                messageFormat: "Type '{0}' must be declared partial to use [SwaggerUnionSchema].",
+                                category: "Unions.Pure.Csharp",
+                                DiagnosticSeverity.Error,
+                                isEnabledByDefault: true),
+                            cand.TypeDecl.GetLocation(),
+                            hostSymbol.ToDisplayString()));
+                        continue;
+                    }
+
+                    swaggerHosts.Add(new SwaggerHostCandidate(cand.TypeDecl, hostSymbol));
+                }
+
+                if (swaggerHosts.Count == 0)
+                    return;
+
+                // Internal union members are invisible across assemblies (MetadataImportOptions.Public),
+                // so we cannot read member shapes from referenced assemblies directly. Instead each
+                // unions assembly emits a public PureUnionsRegistry_<Assembly> (Type + member name/type
+                // pairs, no Swashbuckle dependency). The Swagger host discovers those public registries
+                // and builds a single runtime ISchemaFilter from them.
+                var registryClasses = CollectUnionRegistryClasses(compilation);
+
+                // A generator can't see its own emitted registry as a symbol in this compilation, so if
+                // this (host) assembly also declares unions, add its registry class name explicitly.
+                if (HasAnyUnion(compilation, candidates))
+                {
+                    var ownAssembly = compilation.AssemblyName ?? compilation.Assembly.Name;
+                    var ownRegistry = "global::Unions.Pure.Csharp.PureUnionsRegistry_" + SanitizeAssemblyNameForClassName(ownAssembly);
+                    if (!registryClasses.Contains(ownRegistry))
+                    {
+                        registryClasses.Add(ownRegistry);
+                        registryClasses.Sort(StringComparer.Ordinal);
+                    }
+                }
+
+                if (registryClasses.Count == 0)
+                    return;
+
+                foreach (var host in swaggerHosts)
+                {
+                    var hostSource = GenerateSwaggerHostSource(host.TypeSymbol, registryClasses);
+                    spc.AddSource(MakeSwaggerHostHintName(host.TypeSymbol), hostSource);
+                }
+            });
+
+            // Emit a public, Swashbuckle-free registry of this assembly's unions (Type + member name/type).
+            // This lets a separate Swagger host assembly build OpenAPI schemas without seeing internal members.
+            initContext.RegisterSourceOutput(compilationAndTargets, static (spc, pair) =>
+            {
+                var (compilation, candidates) = pair;
+
+                if (candidates.IsDefaultOrEmpty)
+                    return;
+
+                var unionTypes = new List<(INamedTypeSymbol TypeSymbol, ITypeSymbol[] Members, string[] TagIds)>();
                 foreach (var cand in candidates)
                 {
                     if (TryGetUnionData(compilation, cand) is (var typeSymbol, var members, var tagIds))
@@ -147,9 +244,9 @@ namespace Unions.Pure.Csharp
                 if (unionTypes.Count == 0)
                     return;
 
-                var assemblyName = unionTypes[0].TypeSymbol.ContainingAssembly.Name;
-                var source = GenerateSwaggerGenSource(unionTypes, assemblyName);
-                spc.AddSource("PureUnionsSwaggerGen.g.cs", source);
+                var assemblyName = compilation.AssemblyName ?? unionTypes[0].TypeSymbol.ContainingAssembly.Name;
+                var registrySource = GenerateUnionRegistrySource(unionTypes, assemblyName);
+                spc.AddSource("PureUnionsRegistry_" + SanitizeAssemblyNameForClassName(assemblyName) + ".g.cs", registrySource);
             });
         }
 
@@ -255,6 +352,262 @@ namespace Unions.Pure.Csharp
 
             var tagIds = BuildTagIdentifiers(members, memberNames);
             return (typeSymbol, members, tagIds);
+        }
+
+        private static IEnumerable<INamedTypeSymbol> GetAllTypes(INamespaceSymbol namespaceSymbol)
+        {
+            foreach (var member in namespaceSymbol.GetMembers())
+            {
+                if (member is INamespaceSymbol childNamespace)
+                {
+                    foreach (var nested in GetAllTypes(childNamespace))
+                        yield return nested;
+                }
+                else if (member is INamedTypeSymbol typeSymbol)
+                {
+                    yield return typeSymbol;
+                    foreach (var nestedType in typeSymbol.GetTypeMembers())
+                        yield return nestedType;
+                }
+            }
+        }
+
+        private static string GenerateSwaggerHostSource(INamedTypeSymbol hostTypeSymbol, List<string> registryClassNames)
+        {
+            var ns = hostTypeSymbol.ContainingNamespace.IsGlobalNamespace
+                ? null
+                : hostTypeSymbol.ContainingNamespace.ToDisplayString();
+            var className = hostTypeSymbol.Name;
+            var hostTypeDisplay = hostTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+            var supportName = className + "UnionSchemaSupport";
+            var filterName = className + "UnionSchemaFilter";
+
+            var sb = new StringBuilder(4096);
+            sb.AppendLine("// <auto-generated/>");
+            sb.AppendLine("// Emitted in the [SwaggerUnionSchema] host project (the one referencing Swashbuckle).");
+            sb.AppendLine("// Builds OpenAPI schemas for union types declared in this assembly and every referenced");
+            sb.AppendLine("// assembly, using the public PureUnionsRegistry_* descriptors those assemblies emit.");
+            sb.AppendLine("#nullable enable");
+            sb.AppendLine("using System;");
+            sb.AppendLine("using System.Collections.Generic;");
+            sb.AppendLine("using System.Linq;");
+            sb.AppendLine("using System.Runtime.CompilerServices;");
+            sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
+            sb.AppendLine("using Microsoft.OpenApi;");
+            sb.AppendLine("using Swashbuckle.AspNetCore.SwaggerGen;");
+            sb.AppendLine();
+
+            if (ns is not null)
+            {
+                sb.Append("namespace ").Append(ns).AppendLine(";");
+                sb.AppendLine();
+            }
+
+            sb.Append("public partial class ").AppendLine(className);
+            sb.AppendLine("{");
+            sb.AppendLine("    /// <summary>");
+            sb.AppendLine("    /// Registers union OpenAPI schemas from this assembly and every referenced assembly that declares [Union] types.");
+            sb.Append("    /// Call from AddSwaggerGen: configure => ").Append(className).AppendLine(".AddUnionSchemaMappings(configure);");
+            sb.AppendLine("    /// </summary>");
+            sb.AppendLine("    public static void AddUnionSchemaMappings(SwaggerGenOptions options)");
+            sb.Append("        => ").Append(supportName).AppendLine(".AddUnionSchemaMappings(options);");
+            sb.AppendLine("}");
+            sb.AppendLine();
+
+            sb.Append("internal static class ").AppendLine(supportName);
+            sb.AppendLine("{");
+            sb.AppendLine("    private static readonly object s_lock = new object();");
+            sb.AppendLine("    private static readonly ConditionalWeakTable<SwaggerGenOptions, object> s_applied = new ConditionalWeakTable<SwaggerGenOptions, object>();");
+            sb.AppendLine();
+            sb.AppendLine("    public static void AddUnionSchemaMappings(SwaggerGenOptions options)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        if (options == null) return;");
+            sb.AppendLine("        EnsureUniqueSchemaIdsForNestedTypes(options);");
+            sb.Append("        var filterType = typeof(").Append(filterName).AppendLine(");");
+            sb.AppendLine("        if (options.SchemaFilterDescriptors.Any(d => d.Type == filterType)) return;");
+            sb.Append("        options.SchemaFilter<").Append(filterName).AppendLine(">();");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+            sb.AppendLine("    /// <summary>");
+            sb.AppendLine("    /// Swashbuckle's default schema id is <c>type.Name</c>. Nested types in different declaring types often share the same short name (e.g. two outer unions both have a nested <c>Good</c>), which crashes schema generation.");
+            sb.AppendLine("    /// This wraps the schema id selector once per <see cref=\"SwaggerGenOptions\"/> instance so nested types use a unique CLR-based id while preserving the previous selector for non-nested types.");
+            sb.AppendLine("    /// </summary>");
+            sb.AppendLine("    private static void EnsureUniqueSchemaIdsForNestedTypes(SwaggerGenOptions options)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        lock (s_lock)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (s_applied.TryGetValue(options, out _))");
+            sb.AppendLine("                return;");
+            sb.AppendLine();
+            sb.AppendLine("            var previous = options.SchemaGeneratorOptions.SchemaIdSelector ?? (type => type.Name);");
+            sb.AppendLine("            options.SchemaGeneratorOptions.SchemaIdSelector = type =>");
+            sb.AppendLine("                type.IsNested");
+            sb.AppendLine("                    ? (type.FullName ?? type.Name).Replace('+', '.')");
+            sb.AppendLine("                    : previous(type);");
+            sb.AppendLine();
+            sb.AppendLine("            s_applied.Add(options, new object());");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+            sb.AppendLine();
+
+            sb.AppendLine("/// <summary>");
+            sb.AppendLine("/// Rewrites each union schema so members map to JSON properties whose schemas are generated (and registered) through Swashbuckle's own pipeline.");
+            sb.AppendLine("/// </summary>");
+            sb.Append("public sealed class ").Append(filterName).AppendLine(" : ISchemaFilter");
+            sb.AppendLine("{");
+            sb.AppendLine("    private static readonly Dictionary<Type, (string Name, Type MemberType)[]> s_members = Build();");
+            sb.AppendLine();
+            sb.AppendLine("    private static Dictionary<Type, (string Name, Type MemberType)[]> Build()");
+            sb.AppendLine("    {");
+            sb.AppendLine("        var map = new Dictionary<Type, (string Name, Type MemberType)[]>();");
+            foreach (var registry in registryClassNames)
+            {
+                sb.Append("        foreach (var u in ").Append(registry).AppendLine(".GetUnions())");
+                sb.AppendLine("            map[u.UnionType] = u.Members;");
+            }
+            sb.AppendLine("        return map;");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+            sb.AppendLine("    public void Apply(IOpenApiSchema schema, SchemaFilterContext context)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        if (schema is not OpenApiSchema target) return;");
+            sb.AppendLine("        if (!s_members.TryGetValue(context.Type, out var members)) return;");
+            sb.AppendLine();
+            sb.AppendLine("        target.Type = JsonSchemaType.Object;");
+            sb.AppendLine("        target.Description = \"Union type: exactly one of the following properties is set.\";");
+            sb.AppendLine("        target.Required = null;");
+            sb.AppendLine("        target.AdditionalProperties = null;");
+            sb.AppendLine("        target.AdditionalPropertiesAllowed = true;");
+            sb.AppendLine();
+            sb.AppendLine("        var properties = new Dictionary<string, IOpenApiSchema>();");
+            sb.AppendLine("        foreach (var member in members)");
+            sb.AppendLine("            properties[member.Name] = context.SchemaGenerator.GenerateSchema(member.MemberType, context.SchemaRepository);");
+            sb.AppendLine("        target.Properties = properties;");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Emits a public, Swashbuckle-free registry of this assembly's union types and their members.
+        /// A Swagger host ([SwaggerUnionSchema]) consumes these because internal union members are not
+        /// visible across assembly boundaries (MetadataImportOptions.Public).
+        /// </summary>
+        private static string GenerateUnionRegistrySource(
+            List<(INamedTypeSymbol TypeSymbol, ITypeSymbol[] Members, string[] TagIds)> unionTypes,
+            string assemblyName)
+        {
+            var className = "PureUnionsRegistry_" + SanitizeAssemblyNameForClassName(assemblyName);
+
+            var sb = new StringBuilder(4096);
+            sb.AppendLine("// <auto-generated/>");
+            sb.AppendLine("#nullable enable");
+            sb.AppendLine("using System;");
+            sb.AppendLine();
+            sb.AppendLine("namespace Unions.Pure.Csharp");
+            sb.AppendLine("{");
+            sb.AppendLine("    /// <summary>");
+            sb.AppendLine("    /// Public, Swashbuckle-free descriptor of this assembly's union types (type + member name/type pairs).");
+            sb.AppendLine("    /// Consumed by a [SwaggerUnionSchema] host to build OpenAPI schemas across assembly boundaries.");
+            sb.AppendLine("    /// </summary>");
+            sb.Append("    public static class ").AppendLine(className);
+            sb.AppendLine("    {");
+            sb.AppendLine("        public static (global::System.Type UnionType, (string Name, global::System.Type MemberType)[] Members)[] GetUnions()");
+            sb.AppendLine("            => new (global::System.Type, (string, global::System.Type)[])[]");
+            sb.AppendLine("            {");
+
+            foreach (var (typeSymbol, members, tagIds) in unionTypes)
+            {
+                var unionTypeofExpr = "typeof(" + typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) + ")";
+                sb.Append("                (").Append(unionTypeofExpr).AppendLine(", new (string, global::System.Type)[]");
+                sb.AppendLine("                {");
+                for (int i = 0; i < members.Length; i++)
+                {
+                    var camelName = FirstLower(tagIds[i]);
+                    var memberTypeofExpr = MemberTypeofExpression(members[i]);
+                    sb.Append("                    (\"").Append(camelName).Append("\", ").Append(memberTypeofExpr).AppendLine("),");
+                }
+                sb.AppendLine("                }),");
+            }
+
+            sb.AppendLine("            };");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Finds every public <c>Unions.Pure.Csharp.PureUnionsRegistry_*</c> class reachable from the
+        /// compilation (this assembly plus all referenced assemblies) and returns their fully-qualified names.
+        /// These are public, so they remain visible under <see cref="MetadataImportOptions"/>.Public.
+        /// </summary>
+        private static bool HasAnyUnion(Compilation compilation, ImmutableArray<Candidate> candidates)
+        {
+            foreach (var cand in candidates)
+            {
+                if (TryGetUnionData(compilation, cand) is not null)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static List<string> CollectUnionRegistryClasses(Compilation compilation)
+        {
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var visited = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
+
+            void VisitAssembly(IAssemblySymbol assembly)
+            {
+                if (!visited.Add(assembly))
+                    return;
+
+                foreach (var typeSymbol in GetAllTypes(assembly.GlobalNamespace))
+                {
+                    if (typeSymbol.DeclaredAccessibility != Accessibility.Public)
+                        continue;
+                    if (!typeSymbol.Name.StartsWith("PureUnionsRegistry_", StringComparison.Ordinal))
+                        continue;
+                    if (typeSymbol.ContainingNamespace?.ToDisplayString() != "Unions.Pure.Csharp")
+                        continue;
+
+                    var display = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                    if (seen.Add(display))
+                        result.Add(display);
+                }
+
+                foreach (var module in assembly.Modules)
+                {
+                    foreach (var referenced in module.ReferencedAssemblySymbols)
+                        VisitAssembly(referenced);
+                }
+            }
+
+            VisitAssembly(compilation.Assembly);
+            result.Sort(StringComparer.Ordinal);
+            return result;
+        }
+
+        private static string MakeSwaggerHostHintName(INamedTypeSymbol hostTypeSymbol)
+        {
+            var displayName = hostTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                .Replace("global::", string.Empty)
+                .Replace("::", "_")
+                .Replace(".", "_")
+                .Replace("+", "_");
+
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(displayName.Length);
+            foreach (var ch in displayName)
+            {
+                sb.Append(invalidChars.Contains(ch) ? '_' : ch);
+            }
+
+            return $"{sb}.SwaggerUnionGen.g.cs";
         }
 
         private static string GenerateUnionSource(
@@ -1056,24 +1409,6 @@ namespace Unions.Pure.Csharp
             return id;
         }
 
-        private static string MakeSwaggerSchemaMethodName(INamedTypeSymbol typeSymbol)
-        {
-            var displayName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-                .Replace("global::", string.Empty)
-                .Replace("::", "_")
-                .Replace(".", "_")
-                .Replace("+", "_");
-
-            var invalidChars = Path.GetInvalidFileNameChars();
-            var sb = new StringBuilder(displayName.Length);
-            foreach (var ch in displayName)
-            {
-                sb.Append(invalidChars.Contains(ch) ? '_' : ch);
-            }
-
-            return "CreateSchema_" + sb;
-        }
-
         private static string SanitizeAssemblyNameForClassName(string assemblyName)
         {
             var sb = new StringBuilder(assemblyName.Length);
@@ -1088,140 +1423,6 @@ namespace Unions.Pure.Csharp
                 return "Assembly";
             if (char.IsDigit(sb[0]))
                 sb.Insert(0, '_');
-            return sb.ToString();
-        }
-
-        private static string GenerateSwaggerGenSource(
-            List<(INamedTypeSymbol TypeSymbol, ITypeSymbol[] Members, string[] TagIds)> unionTypes,
-            string assemblyName)
-        {
-            var assemblySuffix = SanitizeAssemblyNameForClassName(assemblyName);
-            var className = "PureUnionsSwaggerGen_" + assemblySuffix;
-            var filterName = "PureUnionsSchemaFilter_" + assemblySuffix;
-
-            var sb = new StringBuilder(8192);
-            sb.AppendLine("// <auto-generated/>");
-            sb.AppendLine("// Emitted because this project references Swashbuckle.AspNetCore. Call configure.AddPureUnionsSwaggerGen(); in AddSwaggerGen.");
-            sb.AppendLine("#nullable enable");
-            sb.AppendLine("using System;");
-            sb.AppendLine("using System.Collections.Generic;");
-            sb.AppendLine("using System.Linq;");
-            sb.AppendLine("using System.Runtime.CompilerServices;");
-            sb.AppendLine("using Microsoft.Extensions.DependencyInjection;");
-            sb.AppendLine("using Microsoft.OpenApi;");
-            sb.AppendLine("using Swashbuckle.AspNetCore.SwaggerGen;");
-            sb.AppendLine();
-            sb.AppendLine("namespace Unions.Pure.Csharp");
-            sb.AppendLine("{");
-
-            // Schema filter that rewrites every union schema as Swashbuckle generates it.
-            // Going through ISchemaFilter (rather than SwaggerGenOptions.MapType) keeps us
-            // inside Swashbuckle's pipeline, which is what we need so that member types are
-            // properly registered into /components/schemas. With MapType the factory output
-            // is taken verbatim and Swashbuckle never gets a chance to walk into referenced
-            // types - the $refs end up dangling.
-            sb.AppendLine("    /// <summary>");
-            sb.AppendLine("    /// Schema filter that rewrites union schemas in this assembly so each member maps to a JSON property whose schema is generated (and registered) through Swashbuckle's own pipeline.");
-            sb.AppendLine("    /// </summary>");
-            sb.Append("    public sealed partial class ").Append(filterName).AppendLine(" : ISchemaFilter");
-            sb.AppendLine("    {");
-            sb.AppendLine("        public void Apply(IOpenApiSchema schema, SchemaFilterContext context)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            if (schema is not OpenApiSchema target) return;");
-            sb.AppendLine();
-
-            foreach (var (typeSymbol, _, _) in unionTypes)
-            {
-                var fullTypeName = typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                var methodName = "Apply_" + MakeSwaggerSchemaMethodName(typeSymbol);
-                sb.Append("            if (context.Type == typeof(").Append(fullTypeName).Append(")) { ")
-                    .Append(methodName).AppendLine("(target, context); return; }");
-            }
-
-            sb.AppendLine("        }");
-            sb.AppendLine();
-
-            foreach (var (typeSymbol, members, tagIds) in unionTypes)
-            {
-                var methodName = "Apply_" + MakeSwaggerSchemaMethodName(typeSymbol);
-                sb.Append("        private static void ").Append(methodName).AppendLine("(OpenApiSchema schema, SchemaFilterContext context)");
-                sb.AppendLine("        {");
-                sb.AppendLine("            schema.Type = JsonSchemaType.Object;");
-                sb.AppendLine("            schema.Description = \"Union type: exactly one of the following properties is set.\";");
-                // Wipe state that Swashbuckle's reflection-based pass may have populated.
-                sb.AppendLine("            schema.Required = null;");
-                sb.AppendLine("            schema.AdditionalProperties = null;");
-                sb.AppendLine("            schema.AdditionalPropertiesAllowed = true;");
-                sb.AppendLine("            schema.Properties = new Dictionary<string, IOpenApiSchema>");
-                sb.AppendLine("            {");
-
-                for (int i = 0; i < members.Length; i++)
-                {
-                    var camelName = FirstLower(tagIds[i]);
-                    var memberTypeofExpr = MemberTypeofExpression(members[i]);
-                    sb.Append("                [\"").Append(camelName)
-                        .Append("\"] = context.SchemaGenerator.GenerateSchema(")
-                        .Append(memberTypeofExpr)
-                        .AppendLine(", context.SchemaRepository),");
-                }
-
-                sb.AppendLine("            };");
-                sb.AppendLine("        }");
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("    }");
-            sb.AppendLine();
-
-            // Entry-point helper class - kept name-compatible with previous releases.
-            sb.AppendLine("    /// <summary>");
-            sb.AppendLine("    /// Swagger/OpenAPI schema mappings for union types in this assembly (e.g. for AOT apps).");
-            sb.Append("    /// Call from AddSwaggerGen: configure.AddPureUnionsSwaggerGen(); or ").Append(className).AppendLine(".AddUnionSchemaMappings(configure);");
-            sb.Append("    /// For referenced assemblies that also have unions + Swashbuckle, call their ").Append(className).AppendLine(".AddUnionSchemaMappings(configure) too.");
-            sb.AppendLine("    /// </summary>");
-            sb.Append("    public static partial class ").AppendLine(className);
-            sb.AppendLine("    {");
-            sb.AppendLine("        private static readonly object s_pureUnionsSchemaIdLock = new object();");
-            sb.AppendLine("        private static readonly ConditionalWeakTable<SwaggerGenOptions, object> s_pureUnionsNestedSchemaIds = new ConditionalWeakTable<SwaggerGenOptions, object>();");
-            sb.AppendLine();
-            sb.AppendLine("        /// <summary>");
-            sb.AppendLine("        /// Swashbuckle's default schema id is <c>type.Name</c>. Nested types in different declaring types often share the same short name (e.g. two outer unions both have a nested <c>Good</c>), which crashes schema generation.");
-            sb.AppendLine("        /// This wraps <see cref=\"SchemaGeneratorOptions.SchemaIdSelector\"/> once per <see cref=\"SwaggerGenOptions\"/> instance so nested types use a unique CLR-based id while preserving the previous selector for non-nested types.");
-            sb.AppendLine("        /// </summary>");
-            sb.AppendLine("        private static void EnsureUniqueSchemaIdsForNestedTypes(SwaggerGenOptions options)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            lock (s_pureUnionsSchemaIdLock)");
-            sb.AppendLine("            {");
-            sb.AppendLine("                if (s_pureUnionsNestedSchemaIds.TryGetValue(options, out _))");
-            sb.AppendLine("                    return;");
-            sb.AppendLine();
-            sb.AppendLine("                var previous = options.SchemaGeneratorOptions.SchemaIdSelector ?? (type => type.Name);");
-            sb.AppendLine("                options.SchemaGeneratorOptions.SchemaIdSelector = type =>");
-            sb.AppendLine("                    type.IsNested");
-            sb.AppendLine("                        ? (type.FullName ?? type.Name).Replace('+', '.')");
-            sb.AppendLine("                        : previous(type);");
-            sb.AppendLine();
-            sb.AppendLine("                s_pureUnionsNestedSchemaIds.Add(options, new object());");
-            sb.AppendLine("            }");
-            sb.AppendLine("        }");
-            sb.AppendLine();
-            sb.AppendLine("        /// <summary>");
-            sb.AppendLine("        /// Registers the assembly's union schema filter on the supplied SwaggerGenOptions. Idempotent - safe to call multiple times.");
-            sb.AppendLine("        /// </summary>");
-            sb.AppendLine("        public static void AddUnionSchemaMappings(SwaggerGenOptions options)");
-            sb.AppendLine("        {");
-            sb.AppendLine("            if (options == null) return;");
-            sb.AppendLine("            EnsureUniqueSchemaIdsForNestedTypes(options);");
-            sb.Append("            var filterType = typeof(").Append(filterName).AppendLine(");");
-            sb.AppendLine("            if (options.SchemaFilterDescriptors.Any(d => d.Type == filterType)) return;");
-            sb.Append("            options.SchemaFilter<").Append(filterName).AppendLine(">();");
-            sb.AppendLine("        }");
-            sb.AppendLine();
-            sb.AppendLine("        /// <summary>Extension for this assembly. Use configure.AddPureUnionsSwaggerGen(); (if only one assembly has unions, otherwise call AddUnionSchemaMappings per assembly).</summary>");
-            sb.AppendLine("        public static void AddPureUnionsSwaggerGen(this SwaggerGenOptions options)");
-            sb.AppendLine("            => AddUnionSchemaMappings(options);");
-            sb.AppendLine("    }");
-            sb.AppendLine("}");
             return sb.ToString();
         }
 
@@ -1242,6 +1443,7 @@ namespace Unions.Pure.Csharp
         }
 
         private readonly record struct Candidate(TypeDeclarationSyntax TypeDecl, bool IsPartial);
+        private readonly record struct SwaggerHostCandidate(TypeDeclarationSyntax TypeDecl, INamedTypeSymbol TypeSymbol);
     }
 }
 
